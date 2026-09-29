@@ -255,12 +255,12 @@ Customer                    Backend Service                    Database
   1. [x] Implement `CartService` with stock validation logic.
   2. [x] Implement `CartController`.
 
-### Sub-Task 9: Order, Checkout & 48-Hour Cancellation Service
+### Sub-Task 9: Order, Checkout & 48-Hour Cancellation Service [x]
 - **Intent**: Implement checkout workflow, configurable gift points calculation, order lifecycle, and exact timestamp 48-hour cancellation rule.
 - **Expected Outcomes**: Order placement, history lookup, buy-again listing, and enforced 48-hour cancellation.
 - **Todo List**:
-  1. Implement `OrderService` with points redemption and exact timestamp 48-hour cancellation check.
-  2. Implement `OrderController`.
+  1. [x] Implement `OrderService` with points redemption and exact timestamp 48-hour cancellation check.
+  2. [x] Implement `OrderController`.
 
 ### Sub-Task 10: Simulated Payment Service & Controller
 - **Intent**: Implement payment processing simulation with order state updates.

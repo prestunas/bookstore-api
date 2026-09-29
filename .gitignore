@@ -30,3 +30,5 @@ application-local.yaml
 docs/*.pptx
 docs/*.docx
 docs/*.pdf
+
+/src/main/resources/application.properties

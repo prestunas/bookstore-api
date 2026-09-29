@@ -1,24 +1,25 @@
 package com.ibm.bookstore.controller;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ibm.bookstore.config.JwtProperties;
+import com.ibm.bookstore.config.SecurityConfig;
 import com.ibm.bookstore.dto.AddCartItemRequest;
 import com.ibm.bookstore.dto.CartItemResponse;
 import com.ibm.bookstore.dto.CartResponse;
 import com.ibm.bookstore.dto.UpdateCartItemRequest;
+import com.ibm.bookstore.exception.GlobalExceptionHandler;
 import com.ibm.bookstore.exception.InsufficientStockException;
 import com.ibm.bookstore.exception.ResourceNotFoundException;
+import com.ibm.bookstore.security.JwtAuthenticationFilter;
 import com.ibm.bookstore.security.JwtUtils;
 import com.ibm.bookstore.service.CartService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import com.ibm.bookstore.config.JwtProperties;
-import com.ibm.bookstore.config.SecurityConfig;
-import com.ibm.bookstore.exception.GlobalExceptionHandler;
-import com.ibm.bookstore.security.JwtAuthenticationFilter;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
-import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -31,7 +32,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -51,21 +51,31 @@ class CartControllerTest {
     @Autowired
     MockMvc mockMvc;
 
-    static final com.fasterxml.jackson.databind.ObjectMapper OBJECT_MAPPER =
-            new com.fasterxml.jackson.databind.ObjectMapper();
+    @Autowired
+    JwtProperties jwtProperties;
+
+    static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     @MockitoBean
     CartService cartService;
 
+    String token;
+
+    @BeforeEach
+    void setUp() {
+        JwtUtils jwtUtils = new JwtUtils(jwtProperties);
+        token = jwtUtils.generateToken(UUID.randomUUID(), "johndoe", "ROLE_CUSTOMER");
+    }
+
     @Test
-    @WithMockUser(username = "johndoe")
     @DisplayName("GET /api/v1/cart - should return 200 with cart response")
     void getCart_Success() throws Exception {
         UUID cartId = UUID.randomUUID();
         CartResponse response = new CartResponse(cartId, List.of(), 0, BigDecimal.ZERO);
         when(cartService.getCart("johndoe")).thenReturn(response);
 
-        mockMvc.perform(get("/api/v1/cart"))
+        mockMvc.perform(get("/api/v1/cart")
+                        .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(cartId.toString()))
                 .andExpect(jsonPath("$.totalQuantity").value(0))
@@ -80,7 +90,6 @@ class CartControllerTest {
     }
 
     @Test
-    @WithMockUser(username = "johndoe")
     @DisplayName("POST /api/v1/cart/items - should return 200 with updated cart")
     void addItem_Success() throws Exception {
         UUID cartId = UUID.randomUUID();
@@ -98,7 +107,7 @@ class CartControllerTest {
         AddCartItemRequest request = new AddCartItemRequest(bookId, 2);
 
         mockMvc.perform(post("/api/v1/cart/items")
-                        .with(csrf())
+                        .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(OBJECT_MAPPER.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -109,7 +118,6 @@ class CartControllerTest {
     }
 
     @Test
-    @WithMockUser(username = "johndoe")
     @DisplayName("POST /api/v1/cart/items - insufficient stock should return 400 ProblemDetail")
     void addItem_InsufficientStock() throws Exception {
         UUID bookId = UUID.randomUUID();
@@ -119,7 +127,7 @@ class CartControllerTest {
         AddCartItemRequest request = new AddCartItemRequest(bookId, 50);
 
         mockMvc.perform(post("/api/v1/cart/items")
-                        .with(csrf())
+                        .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(OBJECT_MAPPER.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
@@ -128,7 +136,6 @@ class CartControllerTest {
     }
 
     @Test
-    @WithMockUser(username = "johndoe")
     @DisplayName("PUT /api/v1/cart/items/{itemId} - should return 200 with updated cart")
     void updateItemQuantity_Success() throws Exception {
         UUID cartId = UUID.randomUUID();
@@ -141,7 +148,7 @@ class CartControllerTest {
         UpdateCartItemRequest request = new UpdateCartItemRequest(5);
 
         mockMvc.perform(put("/api/v1/cart/items/{itemId}", itemId)
-                        .with(csrf())
+                        .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(OBJECT_MAPPER.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -149,7 +156,6 @@ class CartControllerTest {
     }
 
     @Test
-    @WithMockUser(username = "johndoe")
     @DisplayName("DELETE /api/v1/cart/items/{itemId} - should return 200 with updated cart")
     void removeItem_Success() throws Exception {
         UUID cartId = UUID.randomUUID();
@@ -159,13 +165,12 @@ class CartControllerTest {
         when(cartService.removeItem("johndoe", itemId)).thenReturn(response);
 
         mockMvc.perform(delete("/api/v1/cart/items/{itemId}", itemId)
-                        .with(csrf()))
+                        .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalQuantity").value(0));
     }
 
     @Test
-    @WithMockUser(username = "johndoe")
     @DisplayName("DELETE /api/v1/cart/items/{itemId} - not found should return 404 ProblemDetail")
     void removeItem_NotFound() throws Exception {
         UUID itemId = UUID.randomUUID();
@@ -173,19 +178,18 @@ class CartControllerTest {
                 .thenThrow(new ResourceNotFoundException("CartItem", itemId));
 
         mockMvc.perform(delete("/api/v1/cart/items/{itemId}", itemId)
-                        .with(csrf()))
+                        .header("Authorization", "Bearer " + token))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.title").value("Resource Not Found"));
     }
 
     @Test
-    @WithMockUser(username = "johndoe")
     @DisplayName("DELETE /api/v1/cart - should return 204 No Content")
     void clearCart_Success() throws Exception {
         doNothing().when(cartService).clearCart("johndoe");
 
         mockMvc.perform(delete("/api/v1/cart")
-                        .with(csrf()))
+                        .header("Authorization", "Bearer " + token))
                 .andExpect(status().isNoContent());
     }
 }
