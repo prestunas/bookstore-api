@@ -1,0 +1,27 @@
+# Maven build
+target/
+
+# IntelliJ IDEA
+.idea/
+*.iml
+out/
+
+# VS Code
+.vscode/
+
+# Eclipse
+.classpath
+.project
+.settings/
+
+# Local files
+.DS_Store
+*.log
+.env
+.env.*
+!.env.example
+
+# Local configuration and secrets
+application-local.properties
+application-local.yml
+application-local.yaml
