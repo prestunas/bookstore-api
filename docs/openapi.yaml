@@ -1,0 +1,1462 @@
+openapi: 3.1.0
+info:
+  title: Bookstore API
+  version: 1.0.0
+  description: OpenAPI 3.1 specification for the IBM AI Specialist Capstone bookstore backend application.
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+
+paths:
+  # ============================================================================
+  # Authentication & User Profile Endpoints
+  # ============================================================================
+  /api/v1/auth/register:
+    post:
+      tags:
+        - Authentication
+      summary: Register a new customer
+      description: Creates a new user account with ROLE_CUSTOMER and initializes an empty cart.
+      operationId: registerUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Invalid input or validation failure
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '409':
+          description: Username or email already exists
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+
+  /api/v1/auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: Authenticate user
+      description: Validates credentials and returns a stateless JWT token.
+      operationId: loginUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Invalid username or password
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+
+  /api/v1/users/me:
+    get:
+      tags:
+        - Users
+      summary: Get current authenticated user profile
+      description: Returns profile details, current reward points balance, and account status.
+      operationId: getCurrentUserProfile
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: User profile details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfileResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+
+  /api/v1/users/me/addresses:
+    get:
+      tags:
+        - Users
+      summary: List user shipping addresses
+      description: Retrieves all saved delivery addresses for the authenticated customer.
+      operationId: getUserAddresses
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of saved addresses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AddressDto'
+        '401':
+          description: Unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+    post:
+      tags:
+        - Users
+      summary: Add a new shipping address
+      description: Saves a new delivery address for the current customer.
+      operationId: addUserAddress
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAddressRequest'
+      responses:
+        '201':
+          description: Address created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AddressDto'
+        '400':
+          description: Validation error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '401':
+          description: Unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+
+  # ============================================================================
+  # Catalog & Discovery Endpoints
+  # ============================================================================
+  /api/v1/categories:
+    get:
+      tags:
+        - Catalog
+      summary: List all book categories
+      description: Returns all product categories available in the store catalog.
+      operationId: listCategories
+      responses:
+        '200':
+          description: List of categories
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CategoryDto'
+
+  /api/v1/authors:
+    get:
+      tags:
+        - Catalog
+      summary: List authors
+      description: Returns authors with optional keyword search.
+      operationId: listAuthors
+      parameters:
+        - name: query
+          in: query
+          required: false
+          description: Author name search keyword
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of authors
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AuthorDto'
+
+  /api/v1/publishers:
+    get:
+      tags:
+        - Catalog
+      summary: List publishers / brands
+      description: Returns publishers (brands) available in the catalog.
+      operationId: listPublishers
+      parameters:
+        - name: query
+          in: query
+          required: false
+          description: Publisher brand name search keyword
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of publishers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PublisherDto'
+
+  /api/v1/books:
+    get:
+      tags:
+        - Catalog
+      summary: Search and browse books
+      description: Returns a paginated list of books with optional filters for category, author, publisher, and query.
+      operationId: listBooks
+      parameters:
+        - name: categoryId
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: authorId
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: publisherId
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: query
+          in: query
+          required: false
+          description: Text search matching title or description
+          schema:
+            type: string
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 100
+        - name: sort
+          in: query
+          required: false
+          description: Sorting criteria (e.g. price,asc or title,desc)
+          schema:
+            type: string
+            default: title,asc
+      responses:
+        '200':
+          description: Paginated book list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookPageResponse'
+
+  /api/v1/books/{id}:
+    get:
+      tags:
+        - Catalog
+      summary: Get book details
+      description: Returns comprehensive book metadata, stock status, and tentative delivery estimate in days.
+      operationId: getBookById
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Book details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookDetailDto'
+        '404':
+          description: Book not found
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+
+  /api/v1/books/{id}/related:
+    get:
+      tags:
+        - Catalog
+      summary: Get related books
+      description: Returns related books in the same category or by the same author.
+      operationId: getRelatedBooks
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 4
+            maximum: 20
+      responses:
+        '200':
+          description: List of related books
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BookSummaryDto'
+        '404':
+          description: Book not found
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+
+  # ============================================================================
+  # Shopping Cart Endpoints
+  # ============================================================================
+  /api/v1/cart:
+    get:
+      tags:
+        - Cart
+      summary: View customer cart
+      description: Retrieves the current active shopping cart items, item subtotals, and total amount for the authenticated customer.
+      operationId: getCart
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Shopping cart details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+    delete:
+      tags:
+        - Cart
+      summary: Clear entire cart
+      description: Removes all items from the customer's cart.
+      operationId: clearCart
+      security:
+        - BearerAuth: []
+      responses:
+        '204':
+          description: Cart cleared successfully
+        '401':
+          description: Unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+
+  /api/v1/cart/items:
+    post:
+      tags:
+        - Cart
+      summary: Add book to cart
+      description: Adds a book to the shopping cart, validating stock availability.
+      operationId: addCartItem
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddCartItemRequest'
+      responses:
+        '200':
+          description: Updated shopping cart
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartResponse'
+        '400':
+          description: Validation error or insufficient stock
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '401':
+          description: Unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '404':
+          description: Book not found
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+
+  /api/v1/cart/items/{itemId}:
+    put:
+      tags:
+        - Cart
+      summary: Update cart item quantity
+      description: Updates the quantity of a specific cart item with stock check.
+      operationId: updateCartItem
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCartItemRequest'
+      responses:
+        '200':
+          description: Updated cart details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartResponse'
+        '400':
+          description: Invalid quantity or insufficient stock
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '401':
+          description: Unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '404':
+          description: Cart item not found
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+    delete:
+      tags:
+        - Cart
+      summary: Remove item from cart
+      description: Deletes an individual line item from the shopping cart.
+      operationId: removeCartItem
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Updated cart after removal
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '404':
+          description: Cart item not found
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+
+  # ============================================================================
+  # Orders & Checkout Endpoints
+  # ============================================================================
+  /api/v1/orders/checkout:
+    post:
+      tags:
+        - Orders
+      summary: Create order from shopping cart
+      description: Creates an order in PENDING_PAYMENT state, calculates subtotals, applies optional gift points discount, and reserves order information.
+      operationId: checkoutOrder
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CheckoutRequest'
+      responses:
+        '201':
+          description: Order created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+        '400':
+          description: Empty cart, invalid address, or excessive gift points
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '401':
+          description: Unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+
+  /api/v1/orders:
+    get:
+      tags:
+        - Orders
+      summary: List user order history
+      description: Retrieves the order history for the current customer.
+      operationId: listUserOrders
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of user orders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OrderSummaryDto'
+        '401':
+          description: Unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+
+  /api/v1/orders/{orderId}:
+    get:
+      tags:
+        - Orders
+      summary: Get order details
+      description: Returns complete details of a specific order including line items, shipping address, discounts, and payment status.
+      operationId: getOrderById
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Order details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '404':
+          description: Order not found
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+
+  /api/v1/orders/{orderId}/cancel:
+    post:
+      tags:
+        - Orders
+      summary: Cancel order within 48 hours (Demo Rule)
+      description: Cancels an order if the request is placed within the 48-hour cancellation window (demo assumption) from order placement. Restores book inventory only if stock was previously deducted (e.g. for PAID orders).
+      operationId: cancelOrder
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Order cancelled successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+        '400':
+          description: Cancellation window expired (> 48 hours) or order not in cancellable state
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '401':
+          description: Unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '404':
+          description: Order not found
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+
+  /api/v1/orders/buy-again:
+    get:
+      tags:
+        - Orders
+      summary: Buy In Again recommendations
+      description: Returns distinct books previously purchased by the authenticated user to enable one-click re-ordering.
+      operationId: getBuyAgainBooks
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Previously purchased items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BookSummaryDto'
+        '401':
+          description: Unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+
+  /api/v1/recommendations/order-history:
+    get:
+      tags:
+        - Recommendations
+      summary: Recommendations based on Order History
+      description: Suggests books based on categories and authors present in the user's past orders.
+      operationId: getOrderHistoryRecommendations
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 6
+            maximum: 20
+      responses:
+        '200':
+          description: Recommended books
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BookSummaryDto'
+        '401':
+          description: Unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+
+  # ============================================================================
+  # Payments (Simulated) Endpoints
+  # ============================================================================
+  /api/v1/orders/{orderId}/payments:
+    post:
+      tags:
+        - Payments
+      summary: Process simulated payment
+      description: Simulates payment processing for an order in PENDING_PAYMENT state using simulated test inputs (no real card numbers or CVVs). On success, transitions order to PAID, decrements stock, credits reward points, and clears cart.
+      operationId: processPayment
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentRequest'
+      responses:
+        '200':
+          description: Payment processed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '400':
+          description: Payment declined or order not in payable state
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '401':
+          description: Unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '404':
+          description: Order not found
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+
+# ==============================================================================
+# Components & Reusable Schemas
+# ==============================================================================
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Supply JWT Bearer token obtained from /api/v1/auth/login or /api/v1/auth/register
+
+  schemas:
+    # ---------------- Auth Schemas ----------------
+    RegisterRequest:
+      type: object
+      required:
+        - username
+        - email
+        - password
+        - fullName
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 50
+          example: johndoe
+        email:
+          type: string
+          format: email
+          example: john.doe@example.com
+        password:
+          type: string
+          minLength: 6
+          maxLength: 100
+          example: Secret123!
+        fullName:
+          type: string
+          minLength: 2
+          maxLength: 100
+          example: John Doe
+
+    LoginRequest:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+          example: johndoe
+        password:
+          type: string
+          example: Secret123!
+
+    AuthResponse:
+      type: object
+      required:
+        - token
+        - tokenType
+        - userId
+        - username
+        - email
+        - role
+      properties:
+        token:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        tokenType:
+          type: string
+          example: Bearer
+        userId:
+          type: string
+          format: uuid
+        username:
+          type: string
+          example: johndoe
+        email:
+          type: string
+          example: john.doe@example.com
+        role:
+          type: string
+          example: ROLE_CUSTOMER
+
+    UserProfileResponse:
+      type: object
+      required:
+        - id
+        - username
+        - email
+        - fullName
+        - role
+        - rewardPoints
+      properties:
+        id:
+          type: string
+          format: uuid
+        username:
+          type: string
+          example: johndoe
+        email:
+          type: string
+          example: john.doe@example.com
+        fullName:
+          type: string
+          example: John Doe
+        role:
+          type: string
+          example: ROLE_CUSTOMER
+        rewardPoints:
+          type: integer
+          example: 250
+
+    CreateAddressRequest:
+      type: object
+      required:
+        - recipientName
+        - phone
+        - street
+        - city
+        - state
+        - postalCode
+        - country
+      properties:
+        recipientName:
+          type: string
+          example: John Doe
+        phone:
+          type: string
+          example: "+1-555-0199"
+        street:
+          type: string
+          example: "123 Orchard Lane"
+        city:
+          type: string
+          example: "New York"
+        state:
+          type: string
+          example: "NY"
+        postalCode:
+          type: string
+          example: "10001"
+        country:
+          type: string
+          example: "USA"
+        isDefault:
+          type: boolean
+          default: false
+
+    AddressDto:
+      type: object
+      required:
+        - id
+        - recipientName
+        - phone
+        - street
+        - city
+        - state
+        - postalCode
+        - country
+      properties:
+        id:
+          type: string
+          format: uuid
+        recipientName:
+          type: string
+          example: John Doe
+        phone:
+          type: string
+          example: "+1-555-0199"
+        street:
+          type: string
+          example: "123 Orchard Lane"
+        city:
+          type: string
+          example: "New York"
+        state:
+          type: string
+          example: "NY"
+        postalCode:
+          type: string
+          example: "10001"
+        country:
+          type: string
+          example: "USA"
+        isDefault:
+          type: boolean
+          example: true
+
+    # ---------------- Catalog Schemas ----------------
+    CategoryDto:
+      type: object
+      required:
+        - id
+        - name
+        - slug
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: "Computer Science"
+        slug:
+          type: string
+          example: "computer-science"
+        description:
+          type: string
+          example: "Technical and programming books"
+
+    AuthorDto:
+      type: object
+      required:
+        - id
+        - name
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: "Martin Fowler"
+        bio:
+          type: string
+          example: "Author, speaker, and software architect"
+
+    PublisherDto:
+      type: object
+      required:
+        - id
+        - name
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: "O'Reilly Media"
+        website:
+          type: string
+          example: "https://www.oreilly.com"
+
+    BookSummaryDto:
+      type: object
+      required:
+        - id
+        - title
+        - isbn
+        - price
+        - stockQuantity
+        - authorName
+        - categoryName
+        - expectedDeliveryDays
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+          example: "Clean Code"
+        isbn:
+          type: string
+          example: "978-0132350884"
+        price:
+          type: number
+          format: double
+          example: 39.99
+        stockQuantity:
+          type: integer
+          example: 15
+        coverImageUrl:
+          type: string
+          example: "https://example.com/covers/clean-code.jpg"
+        authorName:
+          type: string
+          example: "Robert C. Martin"
+        categoryName:
+          type: string
+          example: "Software Engineering"
+        expectedDeliveryDays:
+          type: integer
+          example: 3
+
+    BookDetailDto:
+      type: object
+      required:
+        - id
+        - title
+        - isbn
+        - price
+        - stockQuantity
+        - expectedDeliveryDays
+        - author
+        - category
+        - publisher
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+          example: "Clean Architecture"
+        isbn:
+          type: string
+          example: "978-0134494166"
+        description:
+          type: string
+          example: "A Craftsman's Guide to Software Structure and Design."
+        price:
+          type: number
+          format: double
+          example: 34.50
+        stockQuantity:
+          type: integer
+          example: 22
+        coverImageUrl:
+          type: string
+          example: "https://example.com/covers/clean-arch.jpg"
+        expectedDeliveryDays:
+          type: integer
+          example: 2
+        author:
+          $ref: '#/components/schemas/AuthorDto'
+        category:
+          $ref: '#/components/schemas/CategoryDto'
+        publisher:
+          $ref: '#/components/schemas/PublisherDto'
+
+    BookPageResponse:
+      type: object
+      required:
+        - content
+        - page
+        - size
+        - totalElements
+        - totalPages
+        - last
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/BookSummaryDto'
+        page:
+          type: integer
+          example: 0
+        size:
+          type: integer
+          example: 10
+        totalElements:
+          type: integer
+          example: 45
+        totalPages:
+          type: integer
+          example: 5
+        last:
+          type: boolean
+          example: false
+
+    # ---------------- Cart Schemas ----------------
+    AddCartItemRequest:
+      type: object
+      required:
+        - bookId
+        - quantity
+      properties:
+        bookId:
+          type: string
+          format: uuid
+        quantity:
+          type: integer
+          minimum: 1
+          example: 1
+
+    UpdateCartItemRequest:
+      type: object
+      required:
+        - quantity
+      properties:
+        quantity:
+          type: integer
+          minimum: 1
+          example: 2
+
+    CartItemResponse:
+      type: object
+      required:
+        - id
+        - bookId
+        - bookTitle
+        - bookIsbn
+        - coverImageUrl
+        - unitPrice
+        - quantity
+        - subtotal
+        - expectedDeliveryDays
+      properties:
+        id:
+          type: string
+          format: uuid
+        bookId:
+          type: string
+          format: uuid
+        bookTitle:
+          type: string
+          example: "Domain-Driven Design"
+        bookIsbn:
+          type: string
+          example: "978-0321125217"
+        coverImageUrl:
+          type: string
+          example: "https://example.com/covers/ddd.jpg"
+        unitPrice:
+          type: number
+          format: double
+          example: 45.00
+        quantity:
+          type: integer
+          example: 2
+        subtotal:
+          type: number
+          format: double
+          example: 90.00
+        expectedDeliveryDays:
+          type: integer
+          example: 3
+
+    CartResponse:
+      type: object
+      required:
+        - id
+        - items
+        - totalQuantity
+        - totalAmount
+      properties:
+        id:
+          type: string
+          format: uuid
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CartItemResponse'
+        totalQuantity:
+          type: integer
+          example: 2
+        totalAmount:
+          type: number
+          format: double
+          example: 90.00
+
+    # ---------------- Order Schemas ----------------
+    CheckoutRequest:
+      type: object
+      required:
+        - addressId
+      properties:
+        addressId:
+          type: string
+          format: uuid
+          description: ID of user's saved shipping address
+        giftPointsToRedeem:
+          type: integer
+          minimum: 0
+          default: 0
+          description: Number of reward gift points to redeem for discount (100 points = $1.00 USD)
+          example: 200
+
+    OrderItemResponse:
+      type: object
+      required:
+        - id
+        - bookId
+        - bookTitle
+        - unitPrice
+        - quantity
+        - subtotal
+      properties:
+        id:
+          type: string
+          format: uuid
+        bookId:
+          type: string
+          format: uuid
+        bookTitle:
+          type: string
+          example: "Designing Data-Intensive Applications"
+        unitPrice:
+          type: number
+          format: double
+          example: 42.00
+        quantity:
+          type: integer
+          example: 1
+        subtotal:
+          type: number
+          format: double
+          example: 42.00
+
+    OrderSummaryDto:
+      type: object
+      required:
+        - id
+        - orderNumber
+        - status
+        - totalAmount
+        - orderedAt
+        - totalItems
+      properties:
+        id:
+          type: string
+          format: uuid
+        orderNumber:
+          type: string
+          example: "ORD-20250510-9182"
+        status:
+          type: string
+          enum: [PENDING_PAYMENT, PAID, CANCELLED, DELIVERED]
+          example: PAID
+        totalAmount:
+          type: number
+          format: double
+          example: 45.00
+        orderedAt:
+          type: string
+          format: date-time
+          example: "2025-05-10T14:30:00Z"
+        totalItems:
+          type: integer
+          example: 1
+
+    OrderResponse:
+      type: object
+      required:
+        - id
+        - orderNumber
+        - status
+        - items
+        - shippingAddress
+        - subtotal
+        - discountAmount
+        - pointsRedeemed
+        - pointsEarned
+        - taxAmount
+        - shippingAmount
+        - totalAmount
+        - orderedAt
+        - canBeCancelled
+      properties:
+        id:
+          type: string
+          format: uuid
+        orderNumber:
+          type: string
+          example: "ORD-20250510-9182"
+        status:
+          type: string
+          enum: [PENDING_PAYMENT, PAID, CANCELLED, DELIVERED]
+          example: PENDING_PAYMENT
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItemResponse'
+        shippingAddress:
+          $ref: '#/components/schemas/AddressDto'
+        subtotal:
+          type: number
+          format: double
+          example: 84.00
+        discountAmount:
+          type: number
+          format: double
+          example: 2.00
+        pointsRedeemed:
+          type: integer
+          example: 200
+        pointsEarned:
+          type: integer
+          example: 82
+        taxAmount:
+          type: number
+          format: double
+          example: 6.56
+        shippingAmount:
+          type: number
+          format: double
+          example: 5.00
+        totalAmount:
+          type: number
+          format: double
+          example: 93.56
+        orderedAt:
+          type: string
+          format: date-time
+          example: "2025-05-10T14:30:00Z"
+        canBeCancelled:
+          type: boolean
+          description: True if order is within 48 hours (demo cancellation window) of orderedAt and in an eligible state
+          example: true
+
+    # ---------------- Payment Schemas ----------------
+    PaymentRequest:
+      type: object
+      required:
+        - paymentMethod
+        - simulationOutcome
+      properties:
+        paymentMethod:
+          type: string
+          enum: [CREDIT_CARD, DEBIT_CARD, UPI, NET_BANKING]
+          example: CREDIT_CARD
+        simulationOutcome:
+          type: string
+          enum: [SUCCESS, INSUFFICIENT_FUNDS, GATEWAY_TIMEOUT, CARD_EXPIRED]
+          description: Simulated payment outcome trigger for local demo testing without real card credentials
+          example: SUCCESS
+        paymentNotes:
+          type: string
+          description: Optional memo or reference description for simulation
+          example: "Test checkout payment simulation"
+
+    PaymentResponse:
+      type: object
+      required:
+        - id
+        - orderId
+        - paymentReference
+        - paymentMethod
+        - amount
+        - status
+        - paidAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        orderId:
+          type: string
+          format: uuid
+        paymentReference:
+          type: string
+          example: "PAY-20250510-449102"
+        paymentMethod:
+          type: string
+          example: "CREDIT_CARD"
+        amount:
+          type: number
+          format: double
+          example: 93.56
+        status:
+          type: string
+          enum: [SUCCESS, FAILED]
+          example: SUCCESS
+        failureReason:
+          type: string
+          nullable: true
+          example: null
+        paidAt:
+          type: string
+          format: date-time
+          example: "2025-05-10T14:32:15Z"
+
+    # ---------------- Problem Details (RFC 7807) ----------------
+    ProblemDetail:
+      type: object
+      required:
+        - status
+        - title
+      properties:
+        type:
+          type: string
+          format: uri
+          example: "about:blank"
+        title:
+          type: string
+          example: "Bad Request"
+        status:
+          type: integer
+          example: 400
+        detail:
+          type: string
+          example: "Requested book quantity exceeds available stock."
+        instance:
+          type: string
+          example: "/api/v1/cart/items"
+        timestamp:
+          type: string
+          format: date-time
+          example: "2025-05-10T14:35:00Z"
+        errors:
+          type: array
+          description: Field validation errors if applicable
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+                example: "quantity"
+              message:
+                type: string
+                example: "must be greater than or equal to 1"
