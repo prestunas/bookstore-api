@@ -211,15 +211,18 @@ public class OrderService {
             );
         }
 
-        // If order was PAID, restore book inventory and refund redeemed points if applicable
+        // If order was PAID, restore book inventory, refund redeemed points, and reverse earned points exactly once
         if (order.getStatus() == OrderStatus.PAID) {
             for (OrderItem item : order.getItems()) {
                 Book book = item.getBook();
                 book.setStockQuantity(book.getStockQuantity() + item.getQuantity());
                 bookRepository.save(book);
             }
-            if (order.getPointsRedeemed() != null && order.getPointsRedeemed() > 0) {
-                user.setRewardPoints(user.getRewardPoints() + order.getPointsRedeemed());
+            int pointsToRefund = order.getPointsRedeemed() != null ? order.getPointsRedeemed() : 0;
+            int pointsToReverse = order.getPointsEarned() != null ? order.getPointsEarned() : 0;
+            if (pointsToRefund > 0 || pointsToReverse > 0) {
+                int updatedPoints = Math.max(0, user.getRewardPoints() + pointsToRefund - pointsToReverse);
+                user.setRewardPoints(updatedPoints);
                 userRepository.save(user);
             }
         }

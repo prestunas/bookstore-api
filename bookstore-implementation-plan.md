@@ -266,8 +266,8 @@ Customer                    Backend Service                    Database
 - **Intent**: Implement payment processing simulation with order state updates.
 - **Expected Outcomes**: Payment completion transitions orders to `PAID`, decrements stock, and updates reward points.
 - **Todo List**:
-  1. Implement `PaymentService` (simulation logic, stock decrement, reward points update).
-  2. Implement `PaymentController`.
+  1. [x] Implement `PaymentService` (simulation logic, stock decrement, reward points update).
+  2. [x] Implement `PaymentController`.
 
 ### Sub-Task 11: Validation & Unit/Integration Tests
 - **Intent**: Verify system behavior with JUnit 5 tests.

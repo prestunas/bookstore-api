@@ -45,6 +45,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -412,7 +413,7 @@ class OrderServiceTest {
     }
 
     @Test
-    @DisplayName("cancelOrder - PAID order cancelled within 48h restores stock and refunds points")
+    @DisplayName("cancelOrder - PAID order cancelled within 48h restores stock, refunds redeemed points, and reverses earned points")
     void cancelOrder_PaidOrder_RestoresStockAndPoints() {
         Instant orderedAt = fixedInstant.minus(1, ChronoUnit.HOURS);
         testBook1.setStockQuantity(5);
@@ -420,6 +421,7 @@ class OrderServiceTest {
 
         Order order = createSampleOrder(testUser, orderedAt, OrderStatus.PAID);
         order.setPointsRedeemed(200);
+        order.setPointsEarned(50);
 
         when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(testUser));
         when(orderRepository.findById(order.getId())).thenReturn(Optional.of(order));
@@ -431,9 +433,34 @@ class OrderServiceTest {
         // Stock should be incremented by item quantity (2) -> 5 + 2 = 7
         assertThat(testBook1.getStockQuantity()).isEqualTo(7);
         verify(bookRepository).save(testBook1);
-        // Points refunded: 100 + 200 = 300
-        assertThat(testUser.getRewardPoints()).isEqualTo(300);
+        // Points refunded (200) and earned reversed (50): 100 + 200 - 50 = 250
+        assertThat(testUser.getRewardPoints()).isEqualTo(250);
         verify(userRepository).save(testUser);
+    }
+
+    @Test
+    @DisplayName("cancelOrder - PENDING_PAYMENT order cancelled within 48h does not alter stock or reward points")
+    void cancelOrder_PendingPaymentOrder_DoesNotAlterStockOrPoints() {
+        Instant orderedAt = fixedInstant.minus(1, ChronoUnit.HOURS);
+        testBook1.setStockQuantity(5);
+        testUser.setRewardPoints(100);
+
+        Order order = createSampleOrder(testUser, orderedAt, OrderStatus.PENDING_PAYMENT);
+        order.setPointsRedeemed(200);
+        order.setPointsEarned(0);
+
+        when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(testUser));
+        when(orderRepository.findById(order.getId())).thenReturn(Optional.of(order));
+        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        OrderResponse response = orderService.cancelOrder("testuser", order.getId());
+
+        assertThat(response.status()).isEqualTo(OrderStatus.CANCELLED);
+        // Stock and points should not change for PENDING_PAYMENT order cancellation
+        assertThat(testBook1.getStockQuantity()).isEqualTo(5);
+        assertThat(testUser.getRewardPoints()).isEqualTo(100);
+        verify(bookRepository, never()).save(any(Book.class));
+        verify(userRepository, never()).save(any(User.class));
     }
 
     @Test
