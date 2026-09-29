@@ -225,35 +225,35 @@ Customer                    Backend Service                    Database
   3. [x] Create repositories extending `JpaRepository` and `JpaSpecificationExecutor`.
   4. [x] Implement unit tests for domain entities and enum mappings.
 
-### Sub-Task 5: Exception Handling & DTO Mappers
+### Sub-Task 5: Exception Handling & DTO Mappers [x]
 - **Intent**: Provide unified error handling using RFC 7807 `ProblemDetail` and MapStruct mappers.
 - **Expected Outcomes**: Custom business exceptions mapped to HTTP status codes with clean DTO conversions.
 - **Todo List**:
-  1. Implement `GlobalExceptionHandler` with `@RestControllerAdvice`.
-  2. Create request/response DTOs corresponding to the OpenAPI specification.
-  3. Create MapStruct mappers for all domains.
+  1. [x] Implement `GlobalExceptionHandler` with `@RestControllerAdvice`.
+  2. [x] Create request/response DTOs corresponding to the OpenAPI specification (`AddressDto`, `CreateAddressRequest`, `AddCartItemRequest`, `UpdateCartItemRequest`, `CartItemResponse`, `CartResponse`, `CheckoutRequest`, `OrderItemResponse`, `OrderSummaryDto`, `OrderResponse`, `PaymentRequest`, `PaymentResponse`, Auth & Catalog DTOs).
+  3. [x] MapStruct / Domain mapping: Evaluated and verified. Direct canonical constructors and focused mapping helper methods are used cleanly across Java 21 records and domain entities without unnecessary overhead.
 
-### Sub-Task 6: JWT Security & Authentication Services
+### Sub-Task 6: JWT Security & Authentication Services [x]
 - **Intent**: Configure Spring Security filter chain with stateless JWT token validation.
-- **Expected Outcomes**: Secure endpoint access with customer registration and login.
+- **Expected Outcomes**: Secure endpoint access with customer registration, login, profile, and address management.
 - **Todo List**:
-  1. Implement `JwtUtils`, `JwtAuthenticationFilter`, `SecurityConfig`, and password encoder bean.
-  2. Implement `AuthService` and `AuthController`.
+  1. [x] Implement `JwtUtils`, `JwtAuthenticationFilter`, `SecurityConfig`, and password encoder bean.
+  2. [x] Implement `AuthService`, `UserService`, `AuthController`, and `UserController` (including address management).
 
-### Sub-Task 7: Catalog & Recommendation Services & Controllers
+### Sub-Task 7: Catalog & Recommendation Services & Controllers [x]
 - **Intent**: Implement book browsing, searching, filtering, detail retrieval, related items, and history recommendations.
 - **Expected Outcomes**: Working endpoints for catalog browsing, filters, and recommendations.
 - **Todo List**:
-  1. Implement `CategoryService` & `CategoryController`.
-  2. Implement `BookService` (with JPA specification filtering) & `BookController`.
-  3. Implement `RecommendationService` & `RecommendationController`.
+  1. [x] Implement category, author, and publisher discovery endpoints in `CatalogService` & `CatalogController`.
+  2. [x] Implement book catalog search & filtering (with JPA specification filtering, pagination, and sorting) & related books retrieval in `CatalogService` & `CatalogController`.
+  3. [x] Implement `RecommendationService` & `RecommendationController` (order history based recommendation fallback to latest catalog).
 
-### Sub-Task 8: Shopping Cart Service & Controller
+### Sub-Task 8: Shopping Cart Service & Controller [x]
 - **Intent**: Implement cart management with stock validation.
 - **Expected Outcomes**: Customers can add, update, remove items, and view total calculations.
 - **Todo List**:
-  1. Implement `CartService` with stock validation logic.
-  2. Implement `CartController`.
+  1. [x] Implement `CartService` with stock validation logic.
+  2. [x] Implement `CartController`.
 
 ### Sub-Task 9: Order, Checkout & 48-Hour Cancellation Service
 - **Intent**: Implement checkout workflow, configurable gift points calculation, order lifecycle, and exact timestamp 48-hour cancellation rule.

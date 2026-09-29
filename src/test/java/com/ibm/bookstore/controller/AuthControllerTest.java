@@ -25,6 +25,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -169,6 +170,51 @@ class AuthControllerTest {
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.username").value("alice"));
+    }
+
+    @Test
+    @DisplayName("GET /users/me/addresses: 200 with address list")
+    void shouldReturnAddressesWithValidToken() throws Exception {
+        JwtUtils utils = new JwtUtils(jwtProperties);
+        String token = utils.generateToken(UUID.randomUUID(), "alice", "ROLE_CUSTOMER");
+
+        com.ibm.bookstore.dto.AddressDto address = new com.ibm.bookstore.dto.AddressDto(
+                UUID.randomUUID(), "Alice Smith", "+1-555-0199", "123 Orchard Lane",
+                "New York", "NY", "10001", "USA", true
+        );
+        when(userService.getUserAddresses("alice")).thenReturn(java.util.List.of(address));
+
+        mockMvc.perform(get("/api/v1/users/me/addresses")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].recipientName").value("Alice Smith"))
+                .andExpect(jsonPath("$[0].city").value("New York"));
+    }
+
+    @Test
+    @DisplayName("POST /users/me/addresses: 201 when adding new address")
+    void shouldCreateAddressWithValidToken() throws Exception {
+        JwtUtils utils = new JwtUtils(jwtProperties);
+        String token = utils.generateToken(UUID.randomUUID(), "alice", "ROLE_CUSTOMER");
+
+        com.ibm.bookstore.dto.CreateAddressRequest request = new com.ibm.bookstore.dto.CreateAddressRequest(
+                "Alice Smith", "+1-555-0199", "123 Orchard Lane",
+                "New York", "NY", "10001", "USA", true
+        );
+        com.ibm.bookstore.dto.AddressDto address = new com.ibm.bookstore.dto.AddressDto(
+                UUID.randomUUID(), "Alice Smith", "+1-555-0199", "123 Orchard Lane",
+                "New York", "NY", "10001", "USA", true
+        );
+        when(userService.addUserAddress(eq("alice"), any(com.ibm.bookstore.dto.CreateAddressRequest.class)))
+                .thenReturn(address);
+
+        mockMvc.perform(post("/api/v1/users/me/addresses")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(MAPPER.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.recipientName").value("Alice Smith"))
+                .andExpect(jsonPath("$.isDefault").value(true));
     }
 
     @Test
