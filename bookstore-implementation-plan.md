@@ -92,8 +92,8 @@ Review of the Capstone architecture diagram, wireframe flows, and sample prompts
 |  Cart  | |     Order     |-------------------->|   OrderItem   |
 +--------+ +---------------+                     +---------------+
      |              |
-1..* |         1..1 |
-     v              v
+1..* |         1..*  |   ← corrected: one order can have multiple payment
+     v              v       attempts (FAILED then SUCCESS retry)
 +--------+ +---------------+
 |CartItem| |    Payment    |
 +--------+ +---------------+
@@ -106,9 +106,9 @@ Review of the Capstone architecture diagram, wireframe flows, and sample prompts
 4. **Author**: `id (UUID)`, `name`, `bio`.
 5. **Publisher**: `id (UUID)`, `name`, `website`.
 6. **Book**: `id (UUID)`, `title`, `isbn`, `category (FK)`, `author (FK)`, `publisher (FK)`, `description`, `price`, `stockQuantity`, `coverImageUrl`, `expectedDeliveryDays`, `active`, `version` (optimistic lock).
-7. **Cart & CartItem**: `Cart` (belongs to `User`), `CartItem` (`cart (FK)`, `book (FK)`, `quantity`, `unitPrice`).
-8. **Order & OrderItem**: `Order` (`id (UUID)`, `orderNumber`, `user (FK)`, `shippingAddress (JSON or FK)`, `subtotal`, `discountAmount`, `taxAmount`, `shippingAmount`, `totalAmount`, `pointsRedeemed`, `pointsEarned`, `status`, `orderedAt`, audit fields). `OrderItem` (`order (FK)`, `book (FK)`, `bookTitle`, `quantity`, `unitPrice`, `subtotal`).
-9. **Payment**: `id (UUID)`, `order (FK)`, `paymentReference`, `paymentMethod (CREDIT_CARD, DEBIT_CARD, UPI, NET_BANKING)`, `amount`, `status (SUCCESS, FAILED)`, `failureReason`, `paidAt`.
+7. **Cart & CartItem**: `Cart` (belongs to `User`), `CartItem` (`cart (FK)`, `book (FK)`, `quantity`). Note: cart items do **not** store a unit price; price is always read live from `books.price`.
+8. **Order & OrderItem**: `Order` (`id (UUID)`, `orderNumber`, `user (FK)`, `shippingAddress` (denormalised inline columns — no FK back to `user_addresses`), `subtotal`, `discountAmount`, `taxAmount`, `shippingAmount`, `totalAmount`, `pointsRedeemed`, `pointsEarned`, `status`, `orderedAt`, audit fields). `OrderItem` (`order (FK)`, `book (FK)`, `bookTitle`, `quantity`, `unitPrice`, `subtotal`).
+9. **Payment**: `id (UUID)`, `order (FK)`, `paymentReference` (UNIQUE), `paymentMethod (CREDIT_CARD, DEBIT_CARD, UPI, NET_BANKING)`, `amount`, `status (SUCCESS, FAILED)`, `failureReason`, `paymentNotes`, `paidAt`. One order may have **multiple** payment rows (failed attempts followed by a successful retry); the FK carries no UNIQUE constraint.
 
 ---
 
@@ -156,21 +156,43 @@ Customer                    Backend Service                    Database
    |                               |                              |
    |--- POST /orders/checkout ---->|                              |
    |                               |-- Create Order (PENDING) --->|
-   |<-- Order Created (orderId) ---|                              |
+   |                               |   + Order Items snapshot     |
+   |<-- 201 Order (PENDING_PAYMENT)|                              |
    |                               |                              |
    |--- POST /orders/{id}/payments>|                              |
-   |    {method, cardNumber...}    |-- Validate Order State       |
-   |                               |-- Simulate Gateway Checks    |
-   |                               |   (Card format, test flags)  |
+   |    {paymentMethod,            |-- Verify order belongs to    |
+   |     simulationOutcome,        |   current user               |
+   |     paymentNotes?}            |-- Check order status         |
    |                               |                              |
-   |                               |-- If SUCCESS:                |
-   |                               |   Order status -> PAID       |
-   |                               |   Decrement Book Stocks      |
-   |                               |   Credit Reward Points       |
-   |                               |   Clear User Cart            |
-   |                               |   Save Payment record ------>|
-   |<-- Payment Success (Receipt)--|                              |
+   |                               |-- If already PAID:           |
+   |                               |   Return existing SUCCESS    |
+   |                               |   record (idempotent)        |
+   |<-- 200 existing receipt ------|                              |
+   |                               |                              |
+   |                               |-- If simulationOutcome       |
+   |                               |   != "SUCCESS":              |
+   |                               |   Save FAILED payment ------>|
+   |                               |   Order stays PENDING        |
+   |<-- 400 PaymentProcessingEx ---|                              |
+   |                               |                              |
+   |    (Customer may retry) ----->|                              |
+   |                               |                              |
+   |                               |-- If simulationOutcome       |
+   |                               |   == "SUCCESS":              |
+   |                               |   Check stock availability   |
+   |                               |   Decrement book stocks ---->|
+   |                               |   Deduct redeemed points     |
+   |                               |   Credit earned points       |
+   |                               |   (floor(subtotal) pts) ---->|
+   |                               |   Order status -> PAID ----->|
+   |                               |   Clear cart items (JPA) --->|
+   |                               |   Save SUCCESS payment ----->|
+   |<-- 200 Payment Receipt -------|                              |
 ```
+
+Simulation outcomes accepted in `simulationOutcome` field: `SUCCESS`, `INSUFFICIENT_FUNDS`,
+`GATEWAY_TIMEOUT`, `CARD_EXPIRED`, or any other string (recorded verbatim as failure reason).
+No real card numbers are used; the field value alone drives the outcome.
 
 ---
 

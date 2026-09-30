@@ -1,0 +1,1038 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bookstore API — Data Model</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:       #ffffff;
+    --surface:  #f7f8fa;
+    --border:   #e2e5ea;
+    --text:     #1f2328;
+    --muted:    #57606a;
+    --accent:   #2563a8;
+    --accent-l: #dbeafe;
+    --green:    #166534;
+    --green-l:  #dcfce7;
+    --amber:    #92400e;
+    --amber-l:  #fef3c7;
+    --red:      #991b1b;
+    --red-l:    #fee2e2;
+    --purple:   #5b21b6;
+    --purple-l: #ede9fe;
+    --teal:     #0f5454;
+    --teal-l:   #ccfbf1;
+    --font:     -apple-system, "Segoe UI", system-ui, sans-serif;
+    --mono:     "SFMono-Regular", "Consolas", "Liberation Mono", monospace;
+    --radius:   6px;
+  }
+
+  html { font-size: 15px; }
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.65;
+    padding: 0 0 60px;
+  }
+
+  /* ── Header ── */
+  .page-header {
+    background: var(--accent);
+    color: #fff;
+    padding: 28px 48px 24px;
+  }
+  .page-header h1 { font-size: 1.65rem; font-weight: 700; letter-spacing: -.02em; }
+  .page-header .subtitle {
+    margin-top: 4px;
+    font-size: .875rem;
+    opacity: .82;
+  }
+
+  /* ── Nav pills ── */
+  .toc {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 48px;
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .toc a {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: .8rem;
+    font-weight: 600;
+    text-decoration: none;
+    color: var(--accent);
+    background: var(--accent-l);
+    transition: background .15s;
+  }
+  .toc a:hover { background: #bfdbfe; }
+
+  /* ── Scope banner ── */
+  .scope {
+    margin: 28px 48px 0;
+    padding: 12px 16px;
+    background: var(--surface);
+    border-left: 4px solid var(--accent);
+    border-radius: 0 var(--radius) var(--radius) 0;
+    font-size: .875rem;
+    color: var(--muted);
+  }
+
+  /* ── Section wrapper ── */
+  .section {
+    margin: 36px 48px 0;
+  }
+  .section-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--text);
+    padding-bottom: 8px;
+    border-bottom: 2px solid var(--border);
+    margin-bottom: 18px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .section-title .num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px; height: 28px;
+    background: var(--accent);
+    color: #fff;
+    border-radius: 50%;
+    font-size: .8rem;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  /* ── Journey table ── */
+  .journey-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .865rem;
+  }
+  .journey-table thead tr {
+    background: var(--accent);
+    color: #fff;
+  }
+  .journey-table th {
+    padding: 9px 13px;
+    text-align: left;
+    font-weight: 600;
+    font-size: .8rem;
+    letter-spacing: .03em;
+    text-transform: uppercase;
+  }
+  .journey-table td {
+    padding: 8px 13px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  .journey-table tbody tr:nth-child(even) td { background: var(--surface); }
+  .journey-table tbody tr:hover td { background: var(--accent-l); }
+  .journey-table .step-num {
+    font-weight: 700;
+    color: var(--accent);
+    white-space: nowrap;
+  }
+  .journey-table .action { font-weight: 500; }
+  .tbl-read  { color: var(--green);  background: var(--green-l);  display: inline-block; padding: 1px 6px; border-radius: 3px; font-family: var(--mono); font-size: .8em; white-space: nowrap; margin: 1px 2px; }
+  .tbl-write { color: var(--red);    background: var(--red-l);    display: inline-block; padding: 1px 6px; border-radius: 3px; font-family: var(--mono); font-size: .8em; white-space: nowrap; margin: 1px 2px; }
+  .tbl-none  { color: var(--muted);  font-style: italic; font-size: .85em; }
+
+  /* ── ER diagram ── */
+  .er-wrapper {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    overflow-x: auto;
+  }
+  .er-wrapper svg {
+    display: block;
+    margin: 0 auto;
+  }
+
+  /* SVG entity colours (applied inline on rects via class) */
+  .ent-users     { fill: #dbeafe; stroke: #2563a8; }
+  .ent-addr      { fill: #ede9fe; stroke: #7c3aed; }
+  .ent-catalog   { fill: #dcfce7; stroke: #16a34a; }
+  .ent-cart      { fill: #fef3c7; stroke: #d97706; }
+  .ent-order     { fill: #fee2e2; stroke: #dc2626; }
+  .ent-payment   { fill: #ccfbf1; stroke: #0d9488; }
+
+  .ent-hdr-users   { fill: #2563a8; }
+  .ent-hdr-addr    { fill: #7c3aed; }
+  .ent-hdr-catalog { fill: #16a34a; }
+  .ent-hdr-cart    { fill: #d97706; }
+  .ent-hdr-order   { fill: #dc2626; }
+  .ent-hdr-payment { fill: #0d9488; }
+
+  /* ── Design decision cards ── */
+  .decisions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(460px, 1fr));
+    gap: 18px;
+  }
+  .decision-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .decision-card-hdr {
+    padding: 10px 16px;
+    font-weight: 700;
+    font-size: .9rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .decision-card-hdr .icon {
+    width: 26px; height: 26px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 50%;
+    font-size: .75rem;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .decision-card-body {
+    padding: 13px 16px;
+    font-size: .875rem;
+    line-height: 1.7;
+  }
+  .decision-card-body code {
+    font-family: var(--mono);
+    font-size: .82em;
+    background: rgba(0,0,0,.06);
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+  .decision-card-body .formula {
+    background: #1e293b;
+    color: #e2e8f0;
+    font-family: var(--mono);
+    font-size: .82em;
+    padding: 10px 14px;
+    border-radius: 4px;
+    margin: 8px 0;
+    white-space: pre;
+    overflow-x: auto;
+  }
+  .decision-card-body strong { color: var(--text); }
+  .decision-card-body .note {
+    margin-top: 8px;
+    padding: 8px 10px;
+    background: var(--amber-l);
+    border-left: 3px solid #d97706;
+    border-radius: 0 3px 3px 0;
+    font-size: .83em;
+    color: var(--amber);
+  }
+  .d1 .decision-card-hdr { background: #dbeafe; color: #1d4ed8; }
+  .d1 .icon { background: #1d4ed8; color: #fff; }
+  .d2 .decision-card-hdr { background: #ede9fe; color: #6d28d9; }
+  .d2 .icon { background: #6d28d9; color: #fff; }
+  .d3 .decision-card-hdr { background: #dcfce7; color: #15803d; }
+  .d3 .icon { background: #15803d; color: #fff; }
+  .d4 .decision-card-hdr { background: #fee2e2; color: #b91c1c; }
+  .d4 .icon { background: #b91c1c; color: #fff; }
+  .d5 .decision-card-hdr { background: #ccfbf1; color: #0f766e; }
+  .d5 .icon { background: #0f766e; color: #fff; }
+  .d6 .decision-card-hdr { background: #fef3c7; color: #b45309; }
+  .d6 .icon { background: #b45309; color: #fff; }
+
+  /* ── Constraints table ── */
+  .constraints-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .865rem;
+  }
+  .constraints-table thead tr { background: #1e293b; color: #f1f5f9; }
+  .constraints-table th {
+    padding: 9px 14px;
+    text-align: left;
+    font-weight: 600;
+    font-size: .78rem;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+  }
+  .constraints-table td { padding: 8px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  .constraints-table tbody tr:nth-child(even) td { background: var(--surface); }
+  .constraints-table tbody tr:hover td { background: var(--accent-l); }
+  .ct-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: .75em;
+    font-weight: 700;
+    white-space: nowrap;
+    font-family: var(--mono);
+  }
+  .ct-unique  { background: var(--accent-l); color: var(--accent); }
+  .ct-check   { background: var(--green-l);  color: var(--green); }
+  .ct-cascade { background: var(--purple-l); color: var(--purple); }
+  .ct-opt     { background: var(--amber-l);  color: var(--amber); }
+
+  /* ── Relationship legend ── */
+  .rel-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 18px;
+    font-size: .825rem;
+  }
+  .rel-legend-item { display: flex; align-items: center; gap: 8px; }
+  .rel-legend svg { flex-shrink: 0; }
+
+  /* ── Footer ── */
+  .page-footer {
+    margin-top: 56px;
+    padding-top: 18px;
+    border-top: 1px solid var(--border);
+    text-align: center;
+    font-size: .78rem;
+    color: var(--muted);
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     HEADER
+════════════════════════════════════════════════════════════════════ -->
+<header class="page-header">
+  <h1>Bookstore API — Data Model</h1>
+  <div class="subtitle">IBM AI Specialist Capstone · PostgreSQL schema · Flyway V1–V4 · Spring Boot 4.1 / JPA</div>
+</header>
+
+<!-- ── Nav ── -->
+<nav class="toc">
+  <a href="#section-journey">1. Customer Journey</a>
+  <a href="#section-er">2. ER Diagram</a>
+  <a href="#section-decisions">3. Design Decisions</a>
+  <a href="#section-constraints">4. Constraints</a>
+</nav>
+
+<!-- ── Scope ── -->
+<div class="scope">
+  <strong>Scope:</strong> Design artifact derived from Flyway migration scripts (<code>V1</code>–<code>V4</code>) and <code>docs/openapi.yaml</code>.
+  Describes the actual implemented schema. No application code or migrations were modified to produce it.
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     SECTION 1 — CUSTOMER JOURNEY
+════════════════════════════════════════════════════════════════════ -->
+<section class="section" id="section-journey">
+  <h2 class="section-title"><span class="num">1</span>Customer Journey → Data Entities</h2>
+  <p style="font-size:.875rem;color:var(--muted);margin-bottom:14px;">
+    Each row maps one capstone wireframe step (slides 3 &amp; 5–10) to the database tables it reads from or writes to.
+    <span style="display:inline-block;background:var(--green-l);color:var(--green);padding:1px 7px;border-radius:3px;font-family:var(--mono);font-size:.8em;margin-left:6px;">green = read</span>
+    <span style="display:inline-block;background:var(--red-l);color:var(--red);padding:1px 7px;border-radius:3px;font-family:var(--mono);font-size:.8em;margin-left:4px;">red = written</span>
+  </p>
+  <table class="journey-table">
+    <thead>
+      <tr>
+        <th style="width:60px">Step</th>
+        <th>Screen / Action</th>
+        <th>Tables Read</th>
+        <th>Tables Written</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="step-num">1</td>
+        <td class="action">Login page</td>
+        <td><span class="tbl-read">users</span></td>
+        <td class="tbl-none">—</td>
+      </tr>
+      <tr>
+        <td class="step-num">2</td>
+        <td class="action">Registration / Authentication</td>
+        <td><span class="tbl-read">users</span></td>
+        <td><span class="tbl-write">users</span> <span class="tbl-write">carts</span></td>
+      </tr>
+      <tr>
+        <td class="step-num">3</td>
+        <td class="action">Home — Recommendations &amp; "Buy Again"</td>
+        <td><span class="tbl-read">orders</span> <span class="tbl-read">order_items</span> <span class="tbl-read">books</span> <span class="tbl-read">categories</span></td>
+        <td class="tbl-none">—</td>
+      </tr>
+      <tr>
+        <td class="step-num">4</td>
+        <td class="action">Recommendations panel (order-history)</td>
+        <td><span class="tbl-read">orders</span> <span class="tbl-read">order_items</span> <span class="tbl-read">books</span> <span class="tbl-read">categories</span></td>
+        <td class="tbl-none">—</td>
+      </tr>
+      <tr>
+        <td class="step-num">5</td>
+        <td class="action">Browse categories</td>
+        <td><span class="tbl-read">categories</span></td>
+        <td class="tbl-none">—</td>
+      </tr>
+      <tr>
+        <td class="step-num">5</td>
+        <td class="action">Browse brands (publishers)</td>
+        <td><span class="tbl-read">publishers</span></td>
+        <td class="tbl-none">—</td>
+      </tr>
+      <tr>
+        <td class="step-num">6</td>
+        <td class="action">Catalogue listing with filters</td>
+        <td><span class="tbl-read">books</span> <span class="tbl-read">categories</span> <span class="tbl-read">authors</span> <span class="tbl-read">publishers</span></td>
+        <td class="tbl-none">—</td>
+      </tr>
+      <tr>
+        <td class="step-num">7</td>
+        <td class="action">Product detail + related books + delivery estimate</td>
+        <td><span class="tbl-read">books</span> <span class="tbl-read">categories</span> <span class="tbl-read">authors</span> <span class="tbl-read">publishers</span></td>
+        <td class="tbl-none">—</td>
+      </tr>
+      <tr>
+        <td class="step-num">8</td>
+        <td class="action">Add / update / remove cart items</td>
+        <td><span class="tbl-read">books</span> <span class="tbl-read">carts</span> <span class="tbl-read">cart_items</span></td>
+        <td><span class="tbl-write">cart_items</span></td>
+      </tr>
+      <tr>
+        <td class="step-num">9</td>
+        <td class="action">Select delivery address at checkout</td>
+        <td><span class="tbl-read">user_addresses</span></td>
+        <td><span class="tbl-write">user_addresses</span></td>
+      </tr>
+      <tr>
+        <td class="step-num">10</td>
+        <td class="action">Gift-points redemption &amp; checkout</td>
+        <td><span class="tbl-read">users</span> <span class="tbl-read">cart_items</span> <span class="tbl-read">books</span></td>
+        <td><span class="tbl-write">orders</span> <span class="tbl-write">order_items</span></td>
+      </tr>
+      <tr>
+        <td class="step-num">11</td>
+        <td class="action">Simulated payment + confirmation</td>
+        <td><span class="tbl-read">orders</span> <span class="tbl-read">books</span></td>
+        <td><span class="tbl-write">payments</span> <span class="tbl-write">orders</span> <span class="tbl-write">books</span> <span class="tbl-write">users</span> <span class="tbl-write">cart_items</span></td>
+      </tr>
+      <tr>
+        <td class="step-num">12</td>
+        <td class="action">View order / 48-hour cancellation</td>
+        <td><span class="tbl-read">orders</span> <span class="tbl-read">order_items</span> <span class="tbl-read">payments</span></td>
+        <td><span class="tbl-write">orders</span> <span class="tbl-write">books</span> <span class="tbl-write">users</span></td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     SECTION 2 — ER DIAGRAM  (completely rewritten)
+     ─────────────────────────────────────────────────────────────────
+     Layout plan  (viewBox 1540 × 1510, entity width 290px, font 13px)
+
+     ROW A  y=20   categories(x=20)  authors(x=370)  publishers(x=720)
+     ROW B  y=240  books(x=370, w=300)
+     ROW C  y=560  users(x=20)  user_addresses(x=390)  carts(x=760)
+                   cart_items(x=1130)
+     ROW D  y=940  orders(x=20)  order_items(x=540)  payments(x=1130)
+
+     Connector routing (all orthogonal paths, no crossing of unrelated boxes):
+       categories → books  : vertical down from categories bottom-centre
+       authors    → books  : vertical down from authors bottom-centre
+       publishers → books  : vertical down from publishers bottom-centre
+       books → cart_items  : right from books (x=670) → H to x=1280 →
+                             V down to cart_items top
+       books → order_items : right from books (x=670) → H to x=1290 →
+                             V down to order_items top (far-right corridor)
+       users → user_addresses: horizontal right
+       users → carts         : exits users top (y=560) → V up to y=500 →
+                               H right to x=905 → V down to carts top
+                               (routes ABOVE user_addresses)
+       users → orders        : vertical down
+       carts → cart_items    : horizontal right
+       orders → order_items  : horizontal right
+       orders → payments     : exits orders bottom → V down to y=1420 →
+                               H right to x=1275 → V up to payments bottom
+                               (routes BELOW order_items)
+════════════════════════════════════════════════════════════════════ -->
+<section class="section" id="section-er">
+  <h2 class="section-title"><span class="num">2</span>Entity-Relationship Diagram</h2>
+
+  <!-- Crow's-foot legend -->
+  <div class="rel-legend">
+    <div class="rel-legend-item">
+      <svg width="60" height="20" viewBox="0 0 60 20">
+        <line x1="4" y1="10" x2="56" y2="10" stroke="#57606a" stroke-width="1.8"/>
+        <line x1="4"  y1="4" x2="4"  y2="16" stroke="#57606a" stroke-width="1.8"/>
+        <line x1="10" y1="4" x2="10" y2="16" stroke="#57606a" stroke-width="1.8"/>
+        <line x1="56" y1="4" x2="56" y2="16" stroke="#57606a" stroke-width="1.8"/>
+        <line x1="50" y1="4" x2="50" y2="16" stroke="#57606a" stroke-width="1.8"/>
+      </svg>
+      <span>exactly one — exactly one</span>
+    </div>
+    <div class="rel-legend-item">
+      <svg width="70" height="20" viewBox="0 0 70 20">
+        <line x1="4" y1="10" x2="66" y2="10" stroke="#57606a" stroke-width="1.8"/>
+        <!-- one side (left) -->
+        <line x1="4"  y1="4" x2="4"  y2="16" stroke="#57606a" stroke-width="1.8"/>
+        <line x1="10" y1="4" x2="10" y2="16" stroke="#57606a" stroke-width="1.8"/>
+        <!-- zero-or-many side (right): circle + crow-foot -->
+        <circle cx="57" cy="10" r="5" fill="none" stroke="#57606a" stroke-width="1.8"/>
+        <line x1="62" y1="4" x2="66" y2="10" stroke="#57606a" stroke-width="1.8"/>
+        <line x1="62" y1="16" x2="66" y2="10" stroke="#57606a" stroke-width="1.8"/>
+        <line x1="66" y1="4" x2="66" y2="16" stroke="#57606a" stroke-width="1.8"/>
+      </svg>
+      <span>one — zero or many</span>
+    </div>
+    <div class="rel-legend-item" style="margin-left:16px;">
+      <span style="display:inline-block;width:13px;height:13px;background:#dbeafe;border:1.5px solid #2563a8;border-radius:2px;"></span><span style="margin-left:5px;">Identity / Auth</span>
+    </div>
+    <div class="rel-legend-item">
+      <span style="display:inline-block;width:13px;height:13px;background:#dcfce7;border:1.5px solid #16a34a;border-radius:2px;"></span><span style="margin-left:5px;">Catalogue</span>
+    </div>
+    <div class="rel-legend-item">
+      <span style="display:inline-block;width:13px;height:13px;background:#fef3c7;border:1.5px solid #d97706;border-radius:2px;"></span><span style="margin-left:5px;">Cart</span>
+    </div>
+    <div class="rel-legend-item">
+      <span style="display:inline-block;width:13px;height:13px;background:#fee2e2;border:1.5px solid #dc2626;border-radius:2px;"></span><span style="margin-left:5px;">Order</span>
+    </div>
+    <div class="rel-legend-item">
+      <span style="display:inline-block;width:13px;height:13px;background:#ccfbf1;border:1.5px solid #0d9488;border-radius:2px;"></span><span style="margin-left:5px;">Payment</span>
+    </div>
+    <div class="rel-legend-item">
+      <span style="display:inline-block;width:13px;height:13px;background:#ede9fe;border:1.5px solid #7c3aed;border-radius:2px;"></span><span style="margin-left:5px;">Address</span>
+    </div>
+  </div>
+
+  <div class="er-wrapper">
+<!--
+  ENTITY BOUNDARIES (left, top, right, bottom  — used to verify connector endpoints)
+  categories   : 20, 20, 310, 228
+  authors      : 370, 20, 660, 212
+  publishers   : 720, 20, 1010, 212
+  books        : 370, 240, 670, 526
+  users        : 20, 560, 310, 770
+  user_addresses: 390, 560, 680, 790
+  carts        : 760, 560, 1050, 680
+  cart_items   : 1130, 560, 1420, 730
+  orders       : 20, 940, 310, 1380
+  order_items  : 540, 940, 830, 1140
+  payments     : 1130, 940, 1420, 1180
+-->
+<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 1500 1620"
+     width="1500"
+     style="max-width:100%;font-family:-apple-system,'Segoe UI',system-ui,sans-serif;display:block;">
+
+<path d="M165,228 L165,270 L450,270 L450,300" fill="none" stroke="#64748b" stroke-width="2"/>
+<line x1="172" y1="236" x2="158" y2="236" stroke="#64748b" stroke-width="2"/>
+<line x1="172" y1="243" x2="158" y2="243" stroke="#64748b" stroke-width="2"/>
+<line x1="443" y1="300" x2="450" y2="286" stroke="#64748b" stroke-width="2"/>
+<line x1="457" y1="300" x2="450" y2="286" stroke="#64748b" stroke-width="2"/>
+<circle cx="450" cy="277" r="5" fill="#f7f8fa" stroke="#64748b" stroke-width="2"/>
+<text x="290" y="260" text-anchor="middle" fill="#64748b" font-size="13" font-weight="600" style="paint-order:stroke;stroke:#f7f8fa;stroke-width:5;stroke-linejoin:round">classifies</text>
+<path d="M515,212 L515,300" fill="none" stroke="#64748b" stroke-width="2"/>
+<line x1="522" y1="220" x2="508" y2="220" stroke="#64748b" stroke-width="2"/>
+<line x1="522" y1="227" x2="508" y2="227" stroke="#64748b" stroke-width="2"/>
+<line x1="508" y1="300" x2="515" y2="286" stroke="#64748b" stroke-width="2"/>
+<line x1="522" y1="300" x2="515" y2="286" stroke="#64748b" stroke-width="2"/>
+<circle cx="515" cy="277" r="5" fill="#f7f8fa" stroke="#64748b" stroke-width="2"/>
+<text x="550" y="251" text-anchor="middle" fill="#64748b" font-size="13" font-weight="600" style="paint-order:stroke;stroke:#f7f8fa;stroke-width:5;stroke-linejoin:round">writes</text>
+<path d="M865,212 L865,270 L590,270 L590,300" fill="none" stroke="#64748b" stroke-width="2"/>
+<line x1="872" y1="220" x2="858" y2="220" stroke="#64748b" stroke-width="2"/>
+<line x1="872" y1="227" x2="858" y2="227" stroke="#64748b" stroke-width="2"/>
+<line x1="583" y1="300" x2="590" y2="286" stroke="#64748b" stroke-width="2"/>
+<line x1="597" y1="300" x2="590" y2="286" stroke="#64748b" stroke-width="2"/>
+<circle cx="590" cy="277" r="5" fill="#f7f8fa" stroke="#64748b" stroke-width="2"/>
+<text x="735" y="260" text-anchor="middle" fill="#64748b" font-size="13" font-weight="600" style="paint-order:stroke;stroke:#f7f8fa;stroke-width:5;stroke-linejoin:round">publishes</text>
+<path d="M310,800 L390,800" fill="none" stroke="#64748b" stroke-width="2"/>
+<line x1="318" y1="793" x2="318" y2="807" stroke="#64748b" stroke-width="2"/>
+<line x1="325" y1="793" x2="325" y2="807" stroke="#64748b" stroke-width="2"/>
+<line x1="390" y1="807" x2="376" y2="800" stroke="#64748b" stroke-width="2"/>
+<line x1="390" y1="793" x2="376" y2="800" stroke="#64748b" stroke-width="2"/>
+<circle cx="367" cy="800" r="5" fill="#f7f8fa" stroke="#64748b" stroke-width="2"/>
+<text x="350" y="784" text-anchor="middle" fill="#64748b" font-size="13" font-weight="600" style="paint-order:stroke;stroke:#f7f8fa;stroke-width:5;stroke-linejoin:round">has</text>
+<path d="M165,700 L165,650 L905,650 L905,700" fill="none" stroke="#64748b" stroke-width="2"/>
+<line x1="158" y1="692" x2="172" y2="692" stroke="#64748b" stroke-width="2"/>
+<line x1="158" y1="685" x2="172" y2="685" stroke="#64748b" stroke-width="2"/>
+<line x1="898" y1="692" x2="912" y2="692" stroke="#64748b" stroke-width="2"/>
+<line x1="898" y1="685" x2="912" y2="685" stroke="#64748b" stroke-width="2"/>
+<text x="715" y="639" text-anchor="middle" fill="#64748b" font-size="13" font-weight="600" style="paint-order:stroke;stroke:#f7f8fa;stroke-width:5;stroke-linejoin:round">owns one</text>
+<path d="M165,910 L165,1080" fill="none" stroke="#64748b" stroke-width="2"/>
+<line x1="172" y1="918" x2="158" y2="918" stroke="#64748b" stroke-width="2"/>
+<line x1="172" y1="925" x2="158" y2="925" stroke="#64748b" stroke-width="2"/>
+<line x1="158" y1="1080" x2="165" y2="1066" stroke="#64748b" stroke-width="2"/>
+<line x1="172" y1="1080" x2="165" y2="1066" stroke="#64748b" stroke-width="2"/>
+<circle cx="165" cy="1057" r="5" fill="#f7f8fa" stroke="#64748b" stroke-width="2"/>
+<text x="195" y="997" text-anchor="middle" fill="#64748b" font-size="13" font-weight="600" style="paint-order:stroke;stroke:#f7f8fa;stroke-width:5;stroke-linejoin:round">places</text>
+<path d="M1050,760 L1130,760" fill="none" stroke="#64748b" stroke-width="2"/>
+<line x1="1058" y1="753" x2="1058" y2="767" stroke="#64748b" stroke-width="2"/>
+<line x1="1065" y1="753" x2="1065" y2="767" stroke="#64748b" stroke-width="2"/>
+<line x1="1130" y1="767" x2="1116" y2="760" stroke="#64748b" stroke-width="2"/>
+<line x1="1130" y1="753" x2="1116" y2="760" stroke="#64748b" stroke-width="2"/>
+<circle cx="1107" cy="760" r="5" fill="#f7f8fa" stroke="#64748b" stroke-width="2"/>
+<text x="1090" y="744" text-anchor="middle" fill="#64748b" font-size="13" font-weight="600" style="paint-order:stroke;stroke:#f7f8fa;stroke-width:5;stroke-linejoin:round">contains</text>
+<path d="M670,430 L1200,430 L1200,700" fill="none" stroke="#64748b" stroke-width="2"/>
+<line x1="678" y1="423" x2="678" y2="437" stroke="#64748b" stroke-width="2"/>
+<line x1="685" y1="423" x2="685" y2="437" stroke="#64748b" stroke-width="2"/>
+<line x1="1193" y1="700" x2="1200" y2="686" stroke="#64748b" stroke-width="2"/>
+<line x1="1207" y1="700" x2="1200" y2="686" stroke="#64748b" stroke-width="2"/>
+<circle cx="1200" cy="677" r="5" fill="#f7f8fa" stroke="#64748b" stroke-width="2"/>
+<text x="945" y="419" text-anchor="middle" fill="#64748b" font-size="13" font-weight="600" style="paint-order:stroke;stroke:#f7f8fa;stroke-width:5;stroke-linejoin:round">cart_items.book_id</text>
+<path d="M670,475 L1460,475 L1460,1010 L685,1010 L685,1080" fill="none" stroke="#64748b" stroke-width="2" stroke-dasharray="7,4"/>
+<line x1="678" y1="468" x2="678" y2="482" stroke="#64748b" stroke-width="2"/>
+<line x1="685" y1="468" x2="685" y2="482" stroke="#64748b" stroke-width="2"/>
+<line x1="678" y1="1080" x2="685" y2="1066" stroke="#64748b" stroke-width="2"/>
+<line x1="692" y1="1080" x2="685" y2="1066" stroke="#64748b" stroke-width="2"/>
+<circle cx="685" cy="1057" r="5" fill="#f7f8fa" stroke="#64748b" stroke-width="2"/>
+<text x="1030" y="999" text-anchor="middle" fill="#64748b" font-size="13" font-weight="600" style="paint-order:stroke;stroke:#f7f8fa;stroke-width:5;stroke-linejoin:round">order_items.book_id</text>
+<path d="M310,1160 L540,1160" fill="none" stroke="#64748b" stroke-width="2"/>
+<line x1="318" y1="1153" x2="318" y2="1167" stroke="#64748b" stroke-width="2"/>
+<line x1="325" y1="1153" x2="325" y2="1167" stroke="#64748b" stroke-width="2"/>
+<line x1="540" y1="1167" x2="526" y2="1160" stroke="#64748b" stroke-width="2"/>
+<line x1="540" y1="1153" x2="526" y2="1160" stroke="#64748b" stroke-width="2"/>
+<circle cx="517" cy="1160" r="5" fill="#f7f8fa" stroke="#64748b" stroke-width="2"/>
+<text x="425" y="1146" text-anchor="middle" fill="#64748b" font-size="13" font-weight="600" style="paint-order:stroke;stroke:#f7f8fa;stroke-width:5;stroke-linejoin:round">has</text>
+<path d="M165,1520 L165,1575 L1275,1575 L1275,1346" fill="none" stroke="#dc2626" stroke-width="2"/>
+<line x1="172" y1="1528" x2="158" y2="1528" stroke="#dc2626" stroke-width="2"/>
+<line x1="172" y1="1535" x2="158" y2="1535" stroke="#dc2626" stroke-width="2"/>
+<line x1="1282" y1="1346" x2="1275" y2="1360" stroke="#dc2626" stroke-width="2"/>
+<line x1="1268" y1="1346" x2="1275" y2="1360" stroke="#dc2626" stroke-width="2"/>
+<circle cx="1275" cy="1369" r="5" fill="#f7f8fa" stroke="#dc2626" stroke-width="2"/>
+<text x="760" y="1562" text-anchor="middle" fill="#dc2626" font-size="13" font-weight="600" style="paint-order:stroke;stroke:#f7f8fa;stroke-width:5;stroke-linejoin:round">1 order → 0..many payment attempts</text>
+
+  <!-- ═══════════════  ENTITY BOXES  ═══════════════ -->
+
+  <!-- helper macro: each entity = bg rect + header rect + header rect square-off + title + fields -->
+
+  <!-- ── CATEGORIES  x=20, y=20, w=290 ── -->
+  <g id="ent-categories">
+    <rect x="20"  y="20"  width="290" height="208" rx="6" fill="#dcfce7" stroke="#16a34a" stroke-width="1.8"/>
+    <rect x="20"  y="20"  width="290" height="28"  rx="6" fill="#16a34a"/>
+    <rect x="20"  y="40"  width="290" height="8"   fill="#16a34a"/>
+    <text x="165" y="40" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">categories</text>
+    <line x1="20" y1="48" x2="310" y2="48" stroke="#16a34a" stroke-width="1"/>
+    <text x="30" y="68"  fill="#1f2328" font-size="12.5"><tspan font-family="monospace" fill="#7c3aed">PK</tspan>  id  <tspan fill="#57606a">UUID</tspan></text>
+    <text x="30" y="86"  fill="#1f2328" font-size="12.5">    name  <tspan fill="#57606a">VARCHAR(100)</tspan></text>
+    <text x="30" y="104" fill="#1f2328" font-size="12.5"><tspan font-family="monospace" fill="#d97706">UK</tspan>  slug  <tspan fill="#57606a">VARCHAR(120)</tspan></text>
+    <text x="30" y="122" fill="#1f2328" font-size="12.5">    description  <tspan fill="#57606a">TEXT</tspan></text>
+    <text x="30" y="140" fill="#1f2328" font-size="12.5">    created_at  <tspan fill="#57606a">TIMESTAMPTZ</tspan></text>
+    <text x="30" y="158" fill="#1f2328" font-size="12.5">    updated_at  <tspan fill="#57606a">TIMESTAMPTZ</tspan></text>
+  </g>
+
+  <!-- ── AUTHORS  x=370, y=20, w=290 ── -->
+  <g id="ent-authors">
+    <rect x="370" y="20"  width="290" height="192" rx="6" fill="#dcfce7" stroke="#16a34a" stroke-width="1.8"/>
+    <rect x="370" y="20"  width="290" height="28"  rx="6" fill="#16a34a"/>
+    <rect x="370" y="40"  width="290" height="8"   fill="#16a34a"/>
+    <text x="515" y="40" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">authors</text>
+    <line x1="370" y1="48" x2="660" y2="48" stroke="#16a34a" stroke-width="1"/>
+    <text x="380" y="68"  fill="#1f2328" font-size="12.5"><tspan font-family="monospace" fill="#7c3aed">PK</tspan>  id  <tspan fill="#57606a">UUID</tspan></text>
+    <text x="380" y="86"  fill="#1f2328" font-size="12.5">    name  <tspan fill="#57606a">VARCHAR(150)</tspan></text>
+    <text x="380" y="104" fill="#1f2328" font-size="12.5">    bio  <tspan fill="#57606a">TEXT</tspan></text>
+    <text x="380" y="122" fill="#1f2328" font-size="12.5">    created_at  <tspan fill="#57606a">TIMESTAMPTZ</tspan></text>
+    <text x="380" y="140" fill="#1f2328" font-size="12.5">    updated_at  <tspan fill="#57606a">TIMESTAMPTZ</tspan></text>
+  </g>
+
+  <!-- ── PUBLISHERS  x=720, y=20, w=290 ── -->
+  <g id="ent-publishers">
+    <rect x="720" y="20"  width="290" height="192" rx="6" fill="#dcfce7" stroke="#16a34a" stroke-width="1.8"/>
+    <rect x="720" y="20"  width="290" height="28"  rx="6" fill="#16a34a"/>
+    <rect x="720" y="40"  width="290" height="8"   fill="#16a34a"/>
+    <text x="865" y="40" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">publishers</text>
+    <line x1="720" y1="48" x2="1010" y2="48" stroke="#16a34a" stroke-width="1"/>
+    <text x="730" y="68"  fill="#1f2328" font-size="12.5"><tspan font-family="monospace" fill="#7c3aed">PK</tspan>  id  <tspan fill="#57606a">UUID</tspan></text>
+    <text x="730" y="86"  fill="#1f2328" font-size="12.5"><tspan font-family="monospace" fill="#d97706">UK</tspan>  name  <tspan fill="#57606a">VARCHAR(150)</tspan></text>
+    <text x="730" y="104" fill="#1f2328" font-size="12.5">    website  <tspan fill="#57606a">VARCHAR(255)</tspan></text>
+    <text x="730" y="122" fill="#1f2328" font-size="12.5">    created_at  <tspan fill="#57606a">TIMESTAMPTZ</tspan></text>
+    <text x="730" y="140" fill="#1f2328" font-size="12.5">    updated_at  <tspan fill="#57606a">TIMESTAMPTZ</tspan></text>
+  </g>
+
+  <!-- ── BOOKS  x=370, y=240, w=300 ── -->
+  <g id="ent-books" transform="translate(0,60)">
+    <rect x="370" y="240" width="300" height="286" rx="6" fill="#dcfce7" stroke="#16a34a" stroke-width="1.8"/>
+    <rect x="370" y="240" width="300" height="28"  rx="6" fill="#16a34a"/>
+    <rect x="370" y="260" width="300" height="8"   fill="#16a34a"/>
+    <text x="520" y="260" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">books</text>
+    <line x1="370" y1="268" x2="670" y2="268" stroke="#16a34a" stroke-width="1"/>
+    <text x="380" y="288"  fill="#1f2328" font-size="12.5"><tspan font-family="monospace" fill="#7c3aed">PK</tspan>  id  <tspan fill="#57606a">UUID</tspan></text>
+    <text x="380" y="306"  fill="#1f2328" font-size="12.5">    title  <tspan fill="#57606a">VARCHAR(255)</tspan></text>
+    <text x="380" y="324"  fill="#1f2328" font-size="12.5"><tspan font-family="monospace" fill="#d97706">UK</tspan>  isbn  <tspan fill="#57606a">VARCHAR(30)</tspan></text>
+    <text x="380" y="342"  fill="#1f2328" font-size="12.5">    price  <tspan fill="#57606a">NUMERIC(10,2)</tspan></text>
+    <text x="380" y="360"  fill="#1f2328" font-size="12.5">    stock_quantity  <tspan fill="#57606a">INTEGER</tspan></text>
+    <text x="380" y="378"  fill="#1f2328" font-size="12.5">    expected_delivery_days  <tspan fill="#57606a">INT</tspan></text>
+    <text x="380" y="396"  fill="#1f2328" font-size="12.5">    active  <tspan fill="#57606a">BOOLEAN</tspan></text>
+    <text x="380" y="414"  fill="#1f2328" font-size="12.5">    version  <tspan fill="#57606a">BIGINT</tspan>  <tspan fill="#b45309" font-size="11">[opt-lock]</tspan></text>
+    <text x="380" y="432"  fill="#1f2328" font-size="12.5"><tspan font-family="monospace" fill="#dc2626">FK</tspan>  category_id  <tspan fill="#57606a">UUID</tspan></text>
+    <text x="380" y="450"  fill="#1f2328" font-size="12.5"><tspan font-family="monospace" fill="#dc2626">FK</tspan>  author_id  <tspan fill="#57606a">UUID</tspan></text>
+    <text x="380" y="468"  fill="#1f2328" font-size="12.5"><tspan font-family="monospace" fill="#dc2626">FK</tspan>  publisher_id  <tspan fill="#57606a">UUID</tspan></text>
+    <text x="380" y="486"  fill="#57606a" font-size="11.5">    cover_image_url · description · created_at…</text>
+    <!-- note: right edge of books is x=670 — connectors exit from here -->
+  </g>
+
+  <!-- ── USERS  x=20, y=560, w=290 ── -->
+  <g id="ent-users" transform="translate(0,140)">
+    <rect x="20"  y="560" width="290" height="210" rx="6" fill="#dbeafe" stroke="#2563a8" stroke-width="1.8"/>
+    <rect x="20"  y="560" width="290" height="28"  rx="6" fill="#2563a8"/>
+    <rect x="20"  y="580" width="290" height="8"   fill="#2563a8"/>
+    <text x="165" y="580" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">users</text>
+    <line x1="20" y1="588" x2="310" y2="588" stroke="#2563a8" stroke-width="1"/>
+    <text x="30" y="608"  fill="#1f2328" font-size="12.5"><tspan font-family="monospace" fill="#7c3aed">PK</tspan>  id  <tspan fill="#57606a">UUID</tspan></text>
+    <text x="30" y="626"  fill="#1f2328" font-size="12.5"><tspan font-family="monospace" fill="#d97706">UK</tspan>  username  <tspan fill="#57606a">VARCHAR(50)</tspan></text>
+    <text x="30" y="644"  fill="#1f2328" font-size="12.5"><tspan font-family="monospace" fill="#d97706">UK</tspan>  email  <tspan fill="#57606a">VARCHAR(100)</tspan></text>
+    <text x="30" y="662"  fill="#1f2328" font-size="12.5">    password_hash  <tspan fill="#57606a">VARCHAR(255)</tspan></text>
+    <text x="30" y="680"  fill="#1f2328" font-size="12.5">    full_name  <tspan fill="#57606a">VARCHAR(100)</tspan></text>
+    <text x="30" y="698"  fill="#1f2328" font-size="12.5">    role  <tspan fill="#57606a">VARCHAR(30)</tspan></text>
+    <text x="30" y="716"  fill="#1f2328" font-size="12.5">    reward_points  <tspan fill="#57606a">INTEGER</tspan></text>
+    <text x="30" y="734"  fill="#1f2328" font-size="12.5">    active  <tspan fill="#57606a">BOOLEAN</tspan></text>
+    <text x="30" y="752"  fill="#57606a" font-size="11.5">    created_at / updated_at  TIMESTAMPTZ</text>
+  </g>
+
+  <!-- ── USER_ADDRESSES  x=390, y=560, w=290 ── -->
+  <g id="ent-user-addresses" transform="translate(0,140)">
+    <rect x="390" y="560" width="290" height="230" rx="6" fill="#ede9fe" stroke="#7c3aed" stroke-width="1.8"/>
+    <rect x="390" y="560" width="290" height="28"  rx="6" fill="#7c3aed"/>
+    <rect x="390" y="580" width="290" height="8"   fill="#7c3aed"/>
+    <text x="535" y="580" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">user_addresses</text>
+    <line x1="390" y1="588" x2="680" y2="588" stroke="#7c3aed" stroke-width="1"/>
+    <text x="400" y="608"  fill="#1f2328" font-size="12.5"><tspan font-family="monospace" fill="#7c3aed">PK</tspan>  id  <tspan fill="#57606a">UUID</tspan></text>
+    <text x="400" y="626"  fill="#1f2328" font-size="12.5"><tspan font-family="monospace" fill="#dc2626">FK</tspan>  user_id  <tspan fill="#57606a">UUID</tspan></text>
+    <text x="400" y="644"  fill="#1f2328" font-size="12.5">    recipient_name  <tspan fill="#57606a">VARCHAR(100)</tspan></text>
+    <text x="400" y="662"  fill="#1f2328" font-size="12.5">    phone  <tspan fill="#57606a">VARCHAR(30)</tspan></text>
+    <text x="400" y="680"  fill="#1f2328" font-size="12.5">    street  <tspan fill="#57606a">VARCHAR(255)</tspan></text>
+    <text x="400" y="698"  fill="#1f2328" font-size="12.5">    city / state  <tspan fill="#57606a">VARCHAR(100)</tspan></text>
+    <text x="400" y="716"  fill="#1f2328" font-size="12.5">    postal_code  <tspan fill="#57606a">VARCHAR(20)</tspan></text>
+    <text x="400" y="734"  fill="#1f2328" font-size="12.5">    country  <tspan fill="#57606a">VARCHAR(100)</tspan></text>
+    <text x="400" y="752"  fill="#1f2328" font-size="12.5">    is_default  <tspan fill="#57606a">BOOLEAN</tspan></text>
+    <text x="400" y="770"  fill="#57606a" font-size="11.5">    created_at / updated_at  TIMESTAMPTZ</text>
+  </g>
+
+  <!-- ── CARTS  x=760, y=560, w=290 ── -->
+  <g id="ent-carts" transform="translate(0,140)">
+    <rect x="760" y="560" width="290" height="120" rx="6" fill="#fef3c7" stroke="#d97706" stroke-width="1.8"/>
+    <rect x="760" y="560" width="290" height="28"  rx="6" fill="#d97706"/>
+    <rect x="760" y="580" width="290" height="8"   fill="#d97706"/>
+    <text x="905" y="580" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">carts</text>
+    <line x1="760" y1="588" x2="1050" y2="588" stroke="#d97706" stroke-width="1"/>
+    <text x="770" y="608"  fill="#1f2328" font-size="12.5"><tspan font-family="monospace" fill="#7c3aed">PK</tspan>  id  <tspan fill="#57606a">UUID</tspan></text>
+    <text x="770" y="626"  fill="#1f2328" font-size="12.5"><tspan font-family="monospace" fill="#dc2626">FK</tspan>  <tspan font-family="monospace" fill="#d97706">UK</tspan>  user_id  <tspan fill="#57606a">UUID</tspan></text>
+    <text x="770" y="644"  fill="#57606a" font-size="11.5">    created_at / updated_at  TIMESTAMPTZ</text>
+  </g>
+
+  <!-- ── CART_ITEMS  x=1130, y=560, w=290 ── -->
+  <g id="ent-cart-items" transform="translate(0,140)">
+    <rect x="1130" y="560" width="290" height="170" rx="6" fill="#fef3c7" stroke="#d97706" stroke-width="1.8"/>
+    <rect x="1130" y="560" width="290" height="28"  rx="6" fill="#d97706"/>
+    <rect x="1130" y="580" width="290" height="8"   fill="#d97706"/>
+    <text x="1275" y="580" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">cart_items</text>
+    <line x1="1130" y1="588" x2="1420" y2="588" stroke="#d97706" stroke-width="1"/>
+    <text x="1140" y="608"  fill="#1f2328" font-size="12.5"><tspan font-family="monospace" fill="#7c3aed">PK</tspan>  id  <tspan fill="#57606a">UUID</tspan></text>
+    <text x="1140" y="626"  fill="#1f2328" font-size="12.5"><tspan font-family="monospace" fill="#dc2626">FK</tspan>  cart_id  <tspan fill="#57606a">UUID</tspan></text>
+    <text x="1140" y="644"  fill="#1f2328" font-size="12.5"><tspan font-family="monospace" fill="#dc2626">FK</tspan>  book_id  <tspan fill="#57606a">UUID</tspan></text>
+    <text x="1140" y="662"  fill="#1f2328" font-size="12.5">    quantity  <tspan fill="#57606a">INTEGER</tspan>  <tspan fill="#b45309" font-size="11">CHECK &gt;0</tspan></text>
+    <text x="1140" y="680"  fill="#57606a" font-size="11.5">    created_at / updated_at  TIMESTAMPTZ</text>
+    <text x="1140" y="698"  fill="#57606a" font-size="11" font-style="italic">    UNIQUE(cart_id, book_id)</text>
+  </g>
+
+  <!-- ── ORDERS  x=20, y=940, w=290 ── -->
+  <g id="ent-orders" transform="translate(0,140)">
+    <rect x="20"  y="940"  width="290" height="440" rx="6" fill="#fee2e2" stroke="#dc2626" stroke-width="1.8"/>
+    <rect x="20"  y="940"  width="290" height="28"  rx="6" fill="#dc2626"/>
+    <rect x="20"  y="960"  width="290" height="8"   fill="#dc2626"/>
+    <text x="165" y="960" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">orders</text>
+    <line x1="20" y1="968" x2="310" y2="968" stroke="#dc2626" stroke-width="1"/>
+    <text x="30" y="988"   fill="#1f2328" font-size="12.5"><tspan font-family="monospace" fill="#7c3aed">PK</tspan>  id  <tspan fill="#57606a">UUID</tspan></text>
+    <text x="30" y="1006"  fill="#1f2328" font-size="12.5"><tspan font-family="monospace" fill="#d97706">UK</tspan>  order_number  <tspan fill="#57606a">VARCHAR(60)</tspan></text>
+    <text x="30" y="1024"  fill="#1f2328" font-size="12.5"><tspan font-family="monospace" fill="#dc2626">FK</tspan>  user_id  <tspan fill="#57606a">UUID</tspan></text>
+    <text x="30" y="1042"  fill="#1f2328" font-size="12.5">    status  <tspan fill="#57606a">VARCHAR(30)</tspan></text>
+    <text x="30" y="1060"  fill="#1f2328" font-size="12.5">    subtotal  <tspan fill="#57606a">NUMERIC(10,2)</tspan></text>
+    <text x="30" y="1078"  fill="#1f2328" font-size="12.5">    discount_amount  <tspan fill="#57606a">NUMERIC(10,2)</tspan></text>
+    <text x="30" y="1096"  fill="#1f2328" font-size="12.5">    points_redeemed  <tspan fill="#57606a">INTEGER</tspan></text>
+    <text x="30" y="1114"  fill="#1f2328" font-size="12.5">    points_earned  <tspan fill="#57606a">INTEGER</tspan></text>
+    <text x="30" y="1132"  fill="#1f2328" font-size="12.5">    tax_amount  <tspan fill="#57606a">NUMERIC(10,2)</tspan></text>
+    <text x="30" y="1150"  fill="#1f2328" font-size="12.5">    shipping_amount  <tspan fill="#57606a">NUMERIC(10,2)</tspan></text>
+    <text x="30" y="1168"  fill="#1f2328" font-size="12.5">    total_amount  <tspan fill="#57606a">NUMERIC(10,2)</tspan></text>
+    <text x="30" y="1186"  fill="#1f2328" font-size="12.5">    ordered_at  <tspan fill="#57606a">TIMESTAMPTZ</tspan></text>
+    <!-- address snapshot section -->
+    <line x1="30" y1="1196" x2="300" y2="1196" stroke="#dc2626" stroke-width="0.6" stroke-dasharray="4,3"/>
+    <text x="165" y="1212" text-anchor="middle" fill="#b91c1c" font-size="11" font-style="italic">— delivery address snapshot (no FK) —</text>
+    <text x="30" y="1230"  fill="#1f2328" font-size="12.5">    recipient_name  <tspan fill="#57606a">VARCHAR(100)</tspan></text>
+    <text x="30" y="1248"  fill="#1f2328" font-size="12.5">    phone  <tspan fill="#57606a">VARCHAR(30)</tspan></text>
+    <text x="30" y="1266"  fill="#1f2328" font-size="12.5">    street  <tspan fill="#57606a">VARCHAR(255)</tspan></text>
+    <text x="30" y="1284"  fill="#1f2328" font-size="12.5">    city / state  <tspan fill="#57606a">VARCHAR(100)</tspan></text>
+    <text x="30" y="1302"  fill="#1f2328" font-size="12.5">    postal_code / country</text>
+    <line x1="30" y1="1312" x2="300" y2="1312" stroke="#dc2626" stroke-width="0.6" stroke-dasharray="4,3"/>
+    <text x="30" y="1330"  fill="#57606a" font-size="11.5">    created_at / updated_at  TIMESTAMPTZ</text>
+    <text x="30" y="1355"  fill="#b91c1c" font-size="11" font-style="italic">    PENDING_PAYMENT → PAID → CANCELLED</text>
+  </g>
+
+  <!-- ── ORDER_ITEMS  x=540, y=940, w=290 ── -->
+  <g id="ent-order-items" transform="translate(0,140)">
+    <rect x="540" y="940"  width="290" height="200" rx="6" fill="#fee2e2" stroke="#dc2626" stroke-width="1.8"/>
+    <rect x="540" y="940"  width="290" height="28"  rx="6" fill="#dc2626"/>
+    <rect x="540" y="960"  width="290" height="8"   fill="#dc2626"/>
+    <text x="685" y="960" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">order_items</text>
+    <line x1="540" y1="968" x2="830" y2="968" stroke="#dc2626" stroke-width="1"/>
+    <text x="550" y="988"  fill="#1f2328" font-size="12.5"><tspan font-family="monospace" fill="#7c3aed">PK</tspan>  id  <tspan fill="#57606a">UUID</tspan></text>
+    <text x="550" y="1006" fill="#1f2328" font-size="12.5"><tspan font-family="monospace" fill="#dc2626">FK</tspan>  order_id  <tspan fill="#57606a">UUID</tspan></text>
+    <text x="550" y="1024" fill="#1f2328" font-size="12.5"><tspan font-family="monospace" fill="#dc2626">FK</tspan>  book_id  <tspan fill="#57606a">UUID</tspan></text>
+    <text x="550" y="1042" fill="#1f2328" font-size="12.5">    book_title  <tspan fill="#57606a">VARCHAR(255)</tspan>  <tspan fill="#b45309" font-size="11">[snap]</tspan></text>
+    <text x="550" y="1060" fill="#1f2328" font-size="12.5">    unit_price  <tspan fill="#57606a">NUMERIC(10,2)</tspan>  <tspan fill="#b45309" font-size="11">[snap]</tspan></text>
+    <text x="550" y="1078" fill="#1f2328" font-size="12.5">    quantity  <tspan fill="#57606a">INTEGER</tspan>  <tspan fill="#b45309" font-size="11">CHECK &gt;0</tspan></text>
+    <text x="550" y="1096" fill="#1f2328" font-size="12.5">    subtotal  <tspan fill="#57606a">NUMERIC(10,2)</tspan>  <tspan fill="#b45309" font-size="11">[snap]</tspan></text>
+    <text x="550" y="1114" fill="#57606a" font-size="11.5">    created_at  TIMESTAMPTZ</text>
+  </g>
+
+  <!-- ── PAYMENTS  x=1130, y=940, w=290 ── -->
+  <g id="ent-payments" transform="translate(0,140)">
+    <rect x="1130" y="940"  width="290" height="240" rx="6" fill="#ccfbf1" stroke="#0d9488" stroke-width="2.2"/>
+    <rect x="1130" y="940"  width="290" height="28"  rx="6" fill="#0d9488"/>
+    <rect x="1130" y="960"  width="290" height="8"   fill="#0d9488"/>
+    <text x="1275" y="960" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">payments</text>
+    <line x1="1130" y1="968" x2="1420" y2="968" stroke="#0d9488" stroke-width="1"/>
+    <text x="1140" y="988"  fill="#1f2328" font-size="12.5"><tspan font-family="monospace" fill="#7c3aed">PK</tspan>  id  <tspan fill="#57606a">UUID</tspan></text>
+    <text x="1140" y="1006" fill="#1f2328" font-size="12.5"><tspan font-family="monospace" fill="#dc2626">FK</tspan>  order_id  <tspan fill="#57606a">UUID</tspan>  <tspan fill="#b45309" font-size="11">no UNIQUE</tspan></text>
+    <text x="1140" y="1024" fill="#1f2328" font-size="12.5"><tspan font-family="monospace" fill="#d97706">UK</tspan>  payment_reference  <tspan fill="#57606a">VARCHAR</tspan></text>
+    <text x="1140" y="1042" fill="#1f2328" font-size="12.5">    payment_method  <tspan fill="#57606a">VARCHAR(30)</tspan></text>
+    <text x="1140" y="1060" fill="#1f2328" font-size="12.5">    amount  <tspan fill="#57606a">NUMERIC(10,2)</tspan></text>
+    <text x="1140" y="1078" fill="#1f2328" font-size="12.5">    status  <tspan fill="#57606a">VARCHAR(30)</tspan>  <tspan fill="#0f766e" font-size="11">[SUCCESS|FAILED]</tspan></text>
+    <text x="1140" y="1096" fill="#1f2328" font-size="12.5">    failure_reason  <tspan fill="#57606a">VARCHAR(255)</tspan></text>
+    <text x="1140" y="1114" fill="#1f2328" font-size="12.5">    payment_notes  <tspan fill="#57606a">VARCHAR(255)</tspan></text>
+    <text x="1140" y="1132" fill="#1f2328" font-size="12.5">    paid_at  <tspan fill="#57606a">TIMESTAMPTZ</tspan></text>
+    <text x="1140" y="1150" fill="#57606a" font-size="11.5">    created_at  TIMESTAMPTZ</text>
+    <!-- cardinality call-out -->
+    <rect x="1132" y="1162" width="286" height="44" rx="4" fill="#fef3c7" stroke="#d97706" stroke-width="1.5"/>
+    <text x="1275" y="1180" text-anchor="middle" fill="#92400e" font-size="11.5" font-weight="700">⚑ One order → many payments</text>
+    <text x="1275" y="1197" text-anchor="middle" fill="#92400e" font-size="10.5">FAILED attempts + SUCCESS retry</text>
+  </g>
+
+</svg>
+  </div><!-- er-wrapper -->
+</section>
+
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     SECTION 3 — DESIGN DECISIONS
+════════════════════════════════════════════════════════════════════ -->
+<section class="section" id="section-decisions">
+  <h2 class="section-title"><span class="num">3</span>Key Design Decisions</h2>
+  <div class="decisions-grid">
+
+    <!-- 3.1 -->
+    <div class="decision-card d1">
+      <div class="decision-card-hdr">
+        <span class="icon">3.1</span>Cart items vs. order-item snapshots
+      </div>
+      <div class="decision-card-body">
+        <p><code>cart_items</code> stores only <code>book_id</code> and <code>quantity</code> — <strong>no price</strong>.
+        The live price is read from <code>books.price</code> each time the cart is displayed or validated,
+        so the basket always reflects the current catalogue price.</p>
+        <p style="margin-top:8px;"><code>order_items</code> captures <code>book_title</code>, <code>unit_price</code>,
+        and <code>subtotal</code> at checkout.  These values are immutable after the order is created,
+        so later catalogue price changes never alter past receipts.
+        The <code>book_id</code> FK is retained so "Buy Again" and Recommendations can navigate back to the live record.</p>
+        <div class="note">Columns marked <strong>[snap]</strong> in the ER diagram are the frozen snapshot fields.</div>
+      </div>
+    </div>
+
+    <!-- 3.2 -->
+    <div class="decision-card d2">
+      <div class="decision-card-hdr">
+        <span class="icon">3.2</span>Delivery address handling
+      </div>
+      <div class="decision-card-body">
+        <p><code>user_addresses</code> is a reusable address book.  One row may be flagged <code>is_default</code>.</p>
+        <p style="margin-top:8px;">At checkout, the chosen address fields
+        (<code>recipient_name</code>, <code>phone</code>, <code>street</code>, <code>city</code>,
+        <code>state</code>, <code>postal_code</code>, <code>country</code>) are
+        <strong>copied inline into the <code>orders</code> row</strong>.
+        There is no FK from <code>orders</code> back to <code>user_addresses</code>.</p>
+        <div class="note">Snapshot design: editing or deleting a saved address never alters a historical order confirmation.</div>
+      </div>
+    </div>
+
+    <!-- 3.3 -->
+    <div class="decision-card d3">
+      <div class="decision-card-hdr">
+        <span class="icon">3.3</span>Reward-points fields
+      </div>
+      <div class="decision-card-body">
+        <p><code>users.reward_points</code> is the running balance — incremented on successful payment, decremented on cancellation.</p>
+        <p style="margin-top:8px;"><code>orders</code> records <code>points_redeemed</code> (applied at checkout)
+        and <code>points_earned</code> (credited on successful payment).</p>
+        <p style="margin-top:8px;"><strong>Earning basis is the subtotal</strong>, not <code>total_amount</code>:</p>
+        <div class="formula">pointsToCredit = floor(order.subtotal)
+// 1 point per whole dollar of subtotal
+// tax, shipping, and redemption discounts are excluded</div>
+        <p>Cancellation reversal (no external ledger needed):</p>
+        <div class="formula">new_balance = max(0, current_balance + points_redeemed − points_earned)</div>
+      </div>
+    </div>
+
+    <!-- 3.4 -->
+    <div class="decision-card d4">
+      <div class="decision-card-hdr">
+        <span class="icon">3.4</span>Inventory (stock_quantity)
+      </div>
+      <div class="decision-card-body">
+        <p><code>books.stock_quantity</code> is decremented <strong>only on successful payment</strong> — not at checkout.</p>
+        <p style="margin-top:8px;"><strong>There is no reservation step.</strong>
+        Stock is neither decremented nor locked when an order is created or when a payment attempt fails.
+        Two customers can both reach the payment screen for the last copy of a book.</p>
+        <p style="margin-top:8px;"><code>PaymentService</code> performs a fresh availability check immediately
+        before decrementing.  If stock has run out, <code>InsufficientStockException</code> is thrown.</p>
+        <p style="margin-top:8px;">The optimistic-lock <code>version</code> column on <code>books</code>
+        prevents a double-decrement race when two concurrent successful payment requests target the same book simultaneously.</p>
+        <div class="note">On cancellation: stock is restored by incrementing <code>stock_quantity</code> by the sum of <code>order_items.quantity</code>.</div>
+      </div>
+    </div>
+
+    <!-- 3.5 -->
+    <div class="decision-card d5">
+      <div class="decision-card-hdr">
+        <span class="icon">3.5</span>Multiple payment attempts per order
+      </div>
+      <div class="decision-card-body">
+        <p><code>payments.order_id</code> is a plain FK with <strong>no UNIQUE constraint</strong>, so one order
+        can accumulate multiple payment rows — for example, a <code>FAILED</code> attempt followed by a
+        successful retry.</p>
+        <p style="margin-top:8px;"><strong>Idempotency is enforced by service logic</strong>, not by the unique constraint:
+        when <code>POST /orders/{id}/payments</code> is called on an already-<code>PAID</code> order,
+        <code>PaymentService</code> queries for an existing <code>SUCCESS</code> record and returns it unchanged
+        — no new row is created.</p>
+        <p style="margin-top:8px;">The <code>payment_reference</code> UNIQUE constraint serves a narrower purpose:
+        guaranteeing a collision-safe reference for each individual attempt, including failed ones.</p>
+        <div class="note" style="background:var(--red-l);border-color:#dc2626;color:var(--red);">
+          ⚑ This is the key cardinality: <strong>Order 1 → many Payments</strong>.  The implementation plan's original
+          diagram incorrectly showed 1:1 — corrected to 1:N.
+        </div>
+      </div>
+    </div>
+
+    <!-- 3.6 -->
+    <div class="decision-card d6">
+      <div class="decision-card-hdr">
+        <span class="icon">3.6</span>One cart per user &amp; cart clearing
+      </div>
+      <div class="decision-card-body">
+        <p><code>carts.user_id</code> carries a UNIQUE constraint — one cart per customer, enforced at the database level.
+        The cart row is created on registration and is <strong>never deleted</strong>.</p>
+        <p style="margin-top:8px;">When the cart is "cleared" after successful payment,
+        <code>PaymentService</code> calls <code>cart.getItems().clear()</code> and saves via JPA.
+        Because <code>Cart</code> declares <code>@OneToMany(cascade = ALL, orphanRemoval = true)</code>,
+        Hibernate issues <code>DELETE</code> statements for the orphaned <code>cart_items</code> rows.</p>
+        <div class="note">This is <strong>JPA orphan-removal</strong>, not the SQL <code>ON DELETE CASCADE</code>
+        on the FK.  The DDL cascade fires only if the <code>carts</code> row itself were deleted directly in the
+        database — which the application never does.</div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     SECTION 4 — CONSTRAINTS
+════════════════════════════════════════════════════════════════════ -->
+<section class="section" id="section-constraints">
+  <h2 class="section-title"><span class="num">4</span>Schema Constraints Summary</h2>
+  <table class="constraints-table">
+    <thead>
+      <tr>
+        <th style="width:130px">Type</th>
+        <th>Table / Column(s)</th>
+        <th>Purpose</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="ct-badge ct-unique">UNIQUE</span></td>
+        <td><code>users.username</code>, <code>users.email</code></td>
+        <td>Prevents duplicate accounts</td>
+      </tr>
+      <tr>
+        <td><span class="ct-badge ct-unique">UNIQUE</span></td>
+        <td><code>categories.slug</code></td>
+        <td>URL-safe category identifier</td>
+      </tr>
+      <tr>
+        <td><span class="ct-badge ct-unique">UNIQUE</span></td>
+        <td><code>publishers.name</code></td>
+        <td>No duplicate publisher records</td>
+      </tr>
+      <tr>
+        <td><span class="ct-badge ct-unique">UNIQUE</span></td>
+        <td><code>books.isbn</code></td>
+        <td>One catalogue entry per ISBN</td>
+      </tr>
+      <tr>
+        <td><span class="ct-badge ct-unique">UNIQUE</span></td>
+        <td><code>carts.user_id</code></td>
+        <td>One active cart per customer</td>
+      </tr>
+      <tr>
+        <td><span class="ct-badge ct-unique">UNIQUE</span></td>
+        <td><code>cart_items(cart_id, book_id)</code></td>
+        <td>No duplicate book title in the same cart</td>
+      </tr>
+      <tr>
+        <td><span class="ct-badge ct-unique">UNIQUE</span></td>
+        <td><code>orders.order_number</code></td>
+        <td>Human-readable order reference</td>
+      </tr>
+      <tr>
+        <td><span class="ct-badge ct-unique">UNIQUE</span></td>
+        <td><code>payments.payment_reference</code></td>
+        <td>Collision-safe reference per attempt (not the idempotency guard — that is service logic)</td>
+      </tr>
+      <tr>
+        <td><span class="ct-badge ct-check">CHECK</span></td>
+        <td><code>cart_items.quantity &gt; 0</code></td>
+        <td>Cart item quantity must be positive</td>
+      </tr>
+      <tr>
+        <td><span class="ct-badge ct-check">CHECK</span></td>
+        <td><code>order_items.quantity &gt; 0</code></td>
+        <td>Order line item quantity must be positive</td>
+      </tr>
+      <tr>
+        <td><span class="ct-badge ct-cascade">ON DELETE CASCADE</span></td>
+        <td><code>user_addresses.user_id → users</code></td>
+        <td>Addresses removed when account is deleted</td>
+      </tr>
+      <tr>
+        <td><span class="ct-badge ct-cascade">ON DELETE CASCADE</span></td>
+        <td><code>cart_items.cart_id → carts</code></td>
+        <td>DDL safety net only — normal clearing uses JPA orphan-removal, not this cascade</td>
+      </tr>
+      <tr>
+        <td><span class="ct-badge ct-cascade">ON DELETE CASCADE</span></td>
+        <td><code>order_items.order_id → orders</code></td>
+        <td>Order line items removed with the order row</td>
+      </tr>
+      <tr>
+        <td><span class="ct-badge ct-opt">Optimistic lock</span></td>
+        <td><code>books.version</code>  <small style="color:var(--muted)">(BIGINT)</small></td>
+        <td>Prevents double-decrement race on concurrent successful payment requests for the same book</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+
+<!-- ── Footer ── -->
+<footer class="page-footer">
+  <p>IBM AI Specialist Capstone · Bookstore API · Schema source: Flyway V1–V4 migrations</p>
+  <p style="margin-top:4px;">Made with IBM Bob</p>
+</footer>
+
+</body>
+</html>
