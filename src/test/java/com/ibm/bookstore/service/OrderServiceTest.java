@@ -489,6 +489,76 @@ class OrderServiceTest {
                 .hasMessageContaining("Delivered orders cannot be cancelled");
     }
 
+    // ---- Reward-Points Edge Cases ----
+
+    @Test
+    @DisplayName("cancelOrder - earned points from cancelled PAID order are reversed against current balance even when those points were already spent on another order")
+    void cancelOrder_EarnedPointsAlreadySpentElsewhere_ReversedAgainstCurrentBalance() {
+        /*
+         * Demo rule (net-balance reversal):
+         *  When a PAID order is cancelled, the system subtracts pointsEarned from the
+         *  user's current balance. It does NOT attempt to trace whether those specific
+         *  points were later spent on a different order. The balance floors at 0.
+         *
+         * Scenario:
+         *  - Initial balance: 500 pts
+         *  - Order A paid  : earned 80 pts   -> balance becomes 580
+         *  - Order B paid  : redeemed 200 pts, earned 50 pts -> balance becomes 580 - 200 + 50 = 430
+         *  - Cancel Order A: refund 0 redeemed, reverse 80 earned -> balance becomes Max(0, 430 - 80) = 350
+         *
+         * The reversal is applied to whatever the current balance is; there is no
+         * per-order points ledger tracing. The Math.max(0, ...) guard prevents a
+         * negative balance in all cases.
+         */
+        Instant orderedAt = fixedInstant.minus(1, ChronoUnit.HOURS);
+
+        // After Order B was paid, user's current balance is 430
+        testUser.setRewardPoints(430);
+
+        // Order A: paid, earned 80 pts, nothing redeemed
+        Order orderA = createSampleOrder(testUser, orderedAt, OrderStatus.PAID);
+        orderA.setPointsRedeemed(0);
+        orderA.setPointsEarned(80);
+
+        when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(testUser));
+        when(orderRepository.findById(orderA.getId())).thenReturn(Optional.of(orderA));
+        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        OrderResponse response = orderService.cancelOrder("testuser", orderA.getId());
+
+        assertThat(response.status()).isEqualTo(OrderStatus.CANCELLED);
+        // Net-balance reversal: 430 + 0 (refund) - 80 (reverse earned) = 350
+        assertThat(testUser.getRewardPoints()).isEqualTo(350);
+        verify(userRepository).save(testUser);
+    }
+
+    @Test
+    @DisplayName("cancelOrder - reversing earned points floors at 0 when current balance is less than points earned")
+    void cancelOrder_EarnedPointsExceedCurrentBalance_FloorAtZero() {
+        /*
+         * Edge case: user spent nearly all points after Order A was paid.
+         * Current balance (5) < pointsEarned on Order A (80).
+         * Math.max(0, 5 + 0 - 80) = 0 — balance must not go negative.
+         */
+        Instant orderedAt = fixedInstant.minus(1, ChronoUnit.HOURS);
+        testUser.setRewardPoints(5);
+
+        Order orderA = createSampleOrder(testUser, orderedAt, OrderStatus.PAID);
+        orderA.setPointsRedeemed(0);
+        orderA.setPointsEarned(80);
+
+        when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(testUser));
+        when(orderRepository.findById(orderA.getId())).thenReturn(Optional.of(orderA));
+        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        OrderResponse response = orderService.cancelOrder("testuser", orderA.getId());
+
+        assertThat(response.status()).isEqualTo(OrderStatus.CANCELLED);
+        // Floored at 0: Max(0, 5 - 80) = 0
+        assertThat(testUser.getRewardPoints()).isEqualTo(0);
+        verify(userRepository).save(testUser);
+    }
+
     // ---- Buy Again Tests ----
 
     @Test

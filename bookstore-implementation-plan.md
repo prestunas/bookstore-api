@@ -55,9 +55,15 @@ Review of the Capstone architecture diagram, wireframe flows, and sample prompts
        throw new OrderCancellationExpiredException("Orders cannot be cancelled after 48 hours from placement time.");
    }
    ```
-5. **Simulated Payment Gateway Rules**:
-   - `testCardNumber` ending in `0000` -> Fails simulation with `DECLINED_INSUFFICIENT_FUNDS`.
-   - Any other card or valid simulated method -> Success, generates transaction reference, transitions order to `PAID`, deducts stock.
+5. **Simulated Payment Gateway Rules** — `simulationOutcome` field in `PaymentRequest` (no real card numbers required):
+   - `SUCCESS` → order transitions to `PAID`, stock decremented, reward points credited, cart cleared, `PAY-*` reference returned.
+   - `INSUFFICIENT_FUNDS` → `PaymentProcessingException` thrown, `FAILED` payment record persisted, order remains `PENDING_PAYMENT`.
+   - `GATEWAY_TIMEOUT` → same as above with "timed out" reason.
+   - `CARD_EXPIRED` → same as above with "Card has expired" reason.
+   - Any unrecognised value → `PaymentProcessingException` with raw value as reason.
+   - Repeated call on already-`PAID` order returns the existing `SUCCESS` payment idempotently (no double-charge).
+
+6. **Reward-Points Floor Rule** *(demo assumption)*: Cancelling a `PAID` order uses net-balance reversal — `pointsEarned` is subtracted from the user's *current* balance regardless of whether those points were already spent on a subsequent order. `Math.max(0, currentBalance + pointsRedeemed - pointsEarned)` ensures the balance never goes negative.
 
 ---
 
@@ -262,32 +268,95 @@ Customer                    Backend Service                    Database
   1. [x] Implement `OrderService` with points redemption and exact timestamp 48-hour cancellation check.
   2. [x] Implement `OrderController`.
 
-### Sub-Task 10: Simulated Payment Service & Controller
+### Sub-Task 10: Simulated Payment Service & Controller [x]
 - **Intent**: Implement payment processing simulation with order state updates.
 - **Expected Outcomes**: Payment completion transitions orders to `PAID`, decrements stock, and updates reward points.
 - **Todo List**:
   1. [x] Implement `PaymentService` (simulation logic, stock decrement, reward points update).
   2. [x] Implement `PaymentController`.
 
-### Sub-Task 11: Validation & Unit/Integration Tests
-- **Intent**: Verify system behavior with JUnit 5 tests.
-- **Expected Outcomes**: Key business flows (checkout, simulated payment, 48-hour cancellation) verified with passing tests.
+### Sub-Task 11: Validation & Unit/Integration Tests [x]
+- **Intent**: Verify system behavior with JUnit 5 tests covering the full customer journey.
+- **Expected Outcomes**: Key business flows verified with 132 passing tests covering registration/login, catalog browsing, cart, checkout, payment, order history, buy-again, recommendations, and 48-hour cancellation.
+- **Reward-Points Edge Case Rule (documented)**: The system uses **net-balance reversal** when cancelling a PAID order. `pointsEarned` is subtracted from the user's *current* balance — the system does not trace whether those specific points were later spent on another order. `Math.max(0, currentBalance + pointsRedeemed - pointsEarned)` prevents a negative balance in all cases.
 - **Todo List**:
-  1. Write unit tests for `OrderService` (including exact 48h cancellation timestamp boundary tests).
-  2. Write unit tests for `CartService` and `PaymentService`.
-  3. Write controller slice tests for catalog and checkout APIs.
+  1. [x] Write unit tests for `OrderService` (including exact 48h cancellation timestamp boundary tests).
+  2. [x] Write unit tests for `CartService` and `PaymentService`.
+  3. [x] Write controller slice tests for catalog, cart, checkout, payment, auth, and recommendations APIs.
+  4. [x] Write unit tests for `RecommendationService` (order-history and fallback paths).
+  5. [x] Write controller slice test for `RecommendationController` (with/without auth).
+  6. [x] Write reward-points edge case unit tests in `OrderServiceTest`:
+     - `cancelOrder_EarnedPointsAlreadySpentElsewhere_ReversedAgainstCurrentBalance`
+     - `cancelOrder_EarnedPointsExceedCurrentBalance_FloorAtZero`
+  7. [x] Write `CustomerJourneyIntegrationTest` against live PostgreSQL covering the full customer journey and the reward-points earn-spend-cancel scenario.
+  8. [x] Validate `docs/openapi.yaml` — 0 errors (fixed `nullable` to OAS 3.1 syntax, added `security: []` to public endpoints, removed invalid `example: null`).
 
 ---
 
 ## 9. Demonstration Checklist
 
-- [ ] **1. OpenAPI Contract**: Validate `docs/openapi.yaml` against OpenAPI 3.1 tools.
-- [ ] **2. Application Boot**: Start application via `./mvnw spring-boot:run` and verify Flyway schema execution.
-- [ ] **3. Swagger UI / OpenAPI**: Access `http://localhost:8080/swagger-ui.html` to explore interactive API documentation.
-- [ ] **4. Catalog & Discovery**: `GET /api/v1/books` (filter by category, author, keyword), `GET /api/v1/books/{id}` (verify delivery days).
-- [ ] **5. User Authentication (JWT)**: Register user `POST /api/v1/auth/register`, login `POST /api/v1/auth/login` to obtain JWT Bearer token.
-- [ ] **6. Cart Management**: `POST /api/v1/cart/items` (add books), verify cart subtotal.
-- [ ] **7. Checkout & Gift Points**: `POST /api/v1/orders/checkout` (apply gift points discount, verify order created in `PENDING_PAYMENT`).
-- [ ] **8. Payment Simulation**: `POST /api/v1/orders/{orderId}/payments` (verify status -> `PAID`, stock decremented, reward points earned).
-- [ ] **9. 48-Hour Cancellation**: Test `POST /api/v1/orders/{orderId}/cancel` on a new order (success) and simulated expired order (rejection with 400).
-- [ ] **10. Recommendations & Buy Again**: `GET /api/v1/orders/buy-again` and `GET /api/v1/recommendations/order-history`.
+- [x] **1. OpenAPI Contract**: `docs/openapi.yaml` validated — 0 errors, 6 advisory warnings (style only). Fixed: `nullable: true` → OAS 3.1 `type: [string, null]`; added `security: []` to public endpoints; removed invalid `example: null`.
+- [x] **2. Application Boot**: Application boots via `./mvnw spring-boot:run` with Flyway migrations applied successfully.
+- [x] **3. Swagger UI / OpenAPI**: Available at `http://localhost:8080/swagger-ui.html`.
+- [x] **4. Catalog & Discovery**: Verified via `CatalogControllerTest` (12 tests) and `CatalogServiceTest` (15 tests); `CustomerJourneyIntegrationTest` step 01 confirms seeded books with delivery days.
+- [x] **5. User Authentication (JWT)**: Verified via `AuthControllerTest` (11 tests) and `AuthServiceTest` (6 tests); JWT token generation, tampered token rejection, and 401 for missing auth confirmed.
+- [x] **6. Cart Management**: Verified via `CartControllerTest` (8 tests) and `CartServiceTest` (9 tests); add, update, remove, clear, stock validation confirmed.
+- [x] **7. Checkout & Gift Points**: Verified via `OrderControllerTest` (9 tests) and `OrderServiceTest` (21 tests); `CustomerJourneyIntegrationTest` step 04 confirms gift-points discount applied at checkout.
+- [x] **8. Payment Simulation**: Verified via `PaymentControllerTest` (7 tests), `PaymentServiceTest` (8 tests), `PaymentLifecycleIntegrationTest` (2 tests), and `CustomerJourneyIntegrationTest` steps 03/05/06; all simulation outcomes (SUCCESS, INSUFFICIENT_FUNDS, GATEWAY_TIMEOUT, CARD_EXPIRED) verified; UPI and NET_BANKING methods tested in integration test.
+- [x] **9. 48-Hour Cancellation**: Exact boundary unit tests in `OrderServiceTest` — at 47h59m (allowed), exactly at 48h (allowed), at 48h+1s (rejected with `OrderCancellationExpiredException`); PAID and PENDING_PAYMENT cancellation behaviors verified.
+- [x] **10. Recommendations & Buy Again**: Verified via `RecommendationControllerTest` (4 tests), `RecommendationServiceTest` (4 tests), and `CustomerJourneyIntegrationTest` step 03; fallback to latest active books when no order history confirmed.
+- [x] **11. Reward-Points Edge Case**: `CustomerJourneyIntegrationTest` step 07 verifies earn-on-A, spend-on-B, cancel-A sequence with net-balance reversal and non-negative balance guarantee.
+
+### Live HTTP Verification (against local PostgreSQL — distinct from automated tests)
+
+All 23 endpoints exercised against `http://localhost:8081` using an isolated test user (`journey_*`) with no shared state.
+
+| Step | Endpoint | Method | Status | Key Result |
+|---|---|---|---|---|
+| 1 | `/api/v1/auth/register` | POST | 201 | `tokenType: Bearer`, `role: ROLE_CUSTOMER` |
+| 2 | `/api/v1/auth/login` | POST | 200 | JWT token present |
+| 3 | `/api/v1/users/me` | GET | 200 | `rewardPoints: 0` for new user |
+| 4 | `/api/v1/users/me/addresses` | POST | 201 | Address created |
+| 5 | `/api/v1/categories` | GET | 200 | 4 categories (no auth required) |
+| 6 | `/api/v1/books` | GET | 200 | `totalElements: 5` (no auth required) |
+| 7 | `/api/v1/books/{id}` | GET | 200 | `expectedDeliveryDays: 3`, `price: 39.5`, `stock: 18` |
+| 8 | `/api/v1/books/{id}/related` | GET | 200 | 3 related books |
+| 9 | `/api/v1/cart` | GET | 200 | 0 items (empty on registration) |
+| 10 | `/api/v1/cart/items` | POST | 200 | `totalQuantity: 2`, `totalAmount: 79.0` |
+| 11 | `/api/v1/orders/checkout` | POST | 201 | `status: PENDING_PAYMENT`, `canBeCancelled: true` |
+| 12 | `/api/v1/orders/{id}/payments` | POST | 200 | `simulationOutcome: SUCCESS` → `status: SUCCESS`, `ref: PAY-*`, cart cleared |
+| 13 | `/api/v1/orders/{id}/payments` | POST | 400 | `simulationOutcome: INSUFFICIENT_FUNDS` → `detail: "Payment failed: Insufficient funds..."`, order stays PENDING |
+| 14 | `/api/v1/orders/{id}` | GET | 200 | `status: PAID`, `pointsEarned: 79`, `canBeCancelled: true` |
+| 15 | `/api/v1/orders` | GET | 200 | 2 orders in history |
+| 16 | `/api/v1/orders/buy-again` | GET | 200 | 1 book from paid order |
+| 17 | `/api/v1/recommendations/order-history` | GET | 200 | 3 recommendations |
+| 18 | `/api/v1/orders/{id}/cancel` | POST | 200 | `status: CANCELLED`, `canBeCancelled: false`, stock restored, points reversed |
+| 19 | `/api/v1/orders/{id}/cancel` (2nd attempt) | POST | 400 | `detail: "Order is already cancelled."` |
+| 20 | `/api/v1/users/me` | GET | 200 | `rewardPoints: 0` (earned 79, reversed on cancel) |
+| 21 | `/api/v1/orders/{id}/cancel` (PENDING cleanup) | POST | 200 | PENDING order cancelled cleanly |
+| 22 | `/api/v1/cart` | GET | 200 | 1 item (cart from failed-payment order, correct — only successful payment clears cart) |
+| 23 | `/api/v1/cart` (no auth) | GET | 401 | Authorization guard confirmed |
+
+**No confirmed bugs.** Step 22 (1 cart item after failed payment) is intentional behaviour: only `PaymentService` on SUCCESS clears the cart; a failed payment leaves the cart intact so the customer can retry.
+
+### Test Run Summary (Sub-Task 11 — verified)
+| Test class | Tests | Result |
+|---|---|---|
+| `AuthControllerTest` | 11 | ✅ |
+| `AuthServiceTest` | 6 | ✅ |
+| `CartControllerTest` | 8 | ✅ |
+| `CartServiceTest` | 9 | ✅ |
+| `CatalogControllerTest` | 12 | ✅ |
+| `CatalogServiceTest` | 15 | ✅ |
+| `OrderControllerTest` | 9 | ✅ |
+| `OrderServiceTest` | 21 | ✅ |
+| `PaymentControllerTest` | 7 | ✅ |
+| `PaymentServiceTest` | 8 | ✅ |
+| `RecommendationControllerTest` | 4 | ✅ |
+| `RecommendationServiceTest` | 4 | ✅ |
+| `CustomerJourneyIntegrationTest` | 7 | ✅ |
+| `PaymentLifecycleIntegrationTest` | 2 | ✅ |
+| `JwtUtilsTest` | 5 | ✅ |
+| `EntityMappingTest` | 3 | ✅ |
+| `BookstoreApiApplicationTests` | 1 | ✅ |
+| **Total** | **132** | **✅ BUILD SUCCESS** |
