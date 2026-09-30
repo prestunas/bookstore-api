@@ -1,0 +1,1116 @@
+================================================================================
+BOOKSTORE API — LIVE HTTP VERIFICATION EVIDENCE
+IBM AI Specialist Capstone — Step 8
+================================================================================
+Verification Date : 2026-09-30
+Base URL          : http://localhost:8081
+Git Commit        : 88e0879 (docs: add data model documentation and HTML diagram)
+PostgreSQL        : localhost:5432 / bookstoredb (credentials not shown)
+App Instance      : PID 98988, started 2026-09-30T08:56:56+03:00 (2026-09-30T05:56:56Z) with JWT_SECRET env var
+                    set per project README. Separate from PID 96998 on *:8080 which
+                    had an empty JWT_SECRET. Port 8081 used because an oc port-forward
+                    process occupies localhost:8080. Same codebase; same database.
+
+REDACTION POLICY  : Passwords replaced with [REDACTED].
+                    JWT tokens replaced with [REDACTED-JWT].
+                    Authorization header values replaced with [REDACTED].
+                    Database credentials not shown.
+                    All UUIDs, amounts, field values and timestamps are real.
+
+SECTION LEGEND
+  CHK-nnn  Original checks from first-pass verification (2026-09-30T05:xx)
+  SCH-nnn  New schema-validation checks added in this review (2026-09-30T06:xx)
+  DB-nnn   Direct SQL read-only queries (2026-09-30T06:xx unless noted)
+  DB-NEW-nnn  New SQL checks added in this review
+
+================================================================================
+SECTION 1 — AUTHENTICATION ENDPOINTS
+================================================================================
+OpenAPI operations covered: POST /api/v1/auth/register, POST /api/v1/auth/login
+
+--- CHK-001 [2026-09-30T05:57:50Z] ---
+Operation  : POST /api/v1/auth/register (success)
+URL        : http://localhost:8081/api/v1/auth/register
+Request Body (sanitized):
+  {"username":"captest001","email":"captest001@capstone.test",
+   "password":"[REDACTED]","fullName":"Capstone Test User"}
+Response Status : 201
+Content-Type    : application/json
+Response Body (sanitized):
+  {"token":"[REDACTED-JWT]","tokenType":"Bearer",
+   "userId":"dce3cc76-780c-493a-996a-03558fdfea89",
+   "username":"captest001","email":"captest001@capstone.test",
+   "role":"ROLE_CUSTOMER"}
+Expected : HTTP 201, AuthResponse with token, tokenType=Bearer, userId (UUID), role=ROLE_CUSTOMER
+Assertions:
+  [PASS] HTTP 201 Created
+  [PASS] Content-Type: application/json
+  [PASS] token present (non-empty string)
+  [PASS] tokenType = "Bearer"
+  [PASS] userId = "dce3cc76-780c-493a-996a-03558fdfea89" (UUID format)
+  [PASS] role = "ROLE_CUSTOMER"
+  [PASS] username = "captest001"
+Result: PASS
+
+--- CHK-002 [2026-09-30T05:58:22Z] ---
+Operation  : POST /api/v1/auth/login (success)
+URL        : http://localhost:8081/api/v1/auth/login
+Request Body (sanitized):
+  {"username":"captest001","password":"[REDACTED]"}
+Response Status : 200
+Content-Type    : application/json
+Response Body (sanitized):
+  {"token":"[REDACTED-JWT]","tokenType":"Bearer",
+   "userId":"dce3cc76-780c-493a-996a-03558fdfea89",
+   "username":"captest001","email":"captest001@capstone.test",
+   "role":"ROLE_CUSTOMER"}
+Expected : HTTP 200, AuthResponse with token
+Assertions:
+  [PASS] HTTP 200 OK
+  [PASS] token present
+  [PASS] tokenType = "Bearer"
+  [PASS] role = "ROLE_CUSTOMER"
+Result: PASS
+
+--- CHK-003 [2026-09-30T05:58:33Z] ---
+Operation  : POST /api/v1/auth/register (409 username conflict)
+URL        : http://localhost:8081/api/v1/auth/register
+Request Body (sanitized):
+  {"username":"captest001","email":"new@email.com",
+   "password":"[REDACTED]","fullName":"Dup User"}
+Response Status : 409
+Content-Type    : application/problem+json
+Response Body:
+  {"detail":"Username already exists: captest001",
+   "instance":"/api/v1/auth/register","status":409,
+   "title":"Username Already Exists",
+   "type":"urn:problem:username-already-exists"}
+Assertions:
+  [PASS] HTTP 409 Conflict
+  [PASS] Content-Type: application/problem+json
+  [PASS] title = "Username Already Exists"
+  [PASS] type = "urn:problem:username-already-exists"
+Result: PASS
+
+--- CHK-004 [2026-09-30T05:58:33Z] ---
+Operation  : POST /api/v1/auth/login (401 wrong password)
+URL        : http://localhost:8081/api/v1/auth/login
+Request Body (sanitized):
+  {"username":"captest001","password":"[REDACTED]"}
+Response Status : 401
+Content-Type    : application/problem+json
+Response Body:
+  {"detail":"Invalid username or password.",
+   "instance":"/api/v1/auth/login","status":401,
+   "title":"Invalid Credentials",
+   "type":"urn:problem:invalid-credentials"}
+Assertions:
+  [PASS] HTTP 401 Unauthorized
+  [PASS] title = "Invalid Credentials"
+Result: PASS
+
+================================================================================
+SECTION 2 — USER PROFILE & ADDRESS ENDPOINTS
+================================================================================
+OpenAPI operations covered: GET /api/v1/users/me,
+  GET /api/v1/users/me/addresses, POST /api/v1/users/me/addresses
+
+--- CHK-005 [2026-09-30T05:58:58Z] ---
+Operation  : GET /api/v1/users/me (authenticated)
+URL        : http://localhost:8081/api/v1/users/me
+Request Headers: Authorization: [REDACTED]
+Response Status : 200
+Content-Type    : application/json
+Response Body:
+  {"id":"dce3cc76-780c-493a-996a-03558fdfea89",
+   "username":"captest001",
+   "email":"captest001@capstone.test",
+   "fullName":"Capstone Test User",
+   "role":"ROLE_CUSTOMER",
+   "rewardPoints":0}
+  Note: rewardPoints=0 at registration time; later purchases raised it to 39.
+Expected : HTTP 200, UserProfileResponse — all required fields present
+Assertions:
+  [PASS] HTTP 200 OK
+  [PASS] id = "dce3cc76-780c-493a-996a-03558fdfea89"
+  [PASS] username = "captest001"
+  [PASS] email = "captest001@capstone.test"
+  [PASS] fullName = "Capstone Test User"
+  [PASS] role = "ROLE_CUSTOMER"
+  [PASS] rewardPoints = 0 (value at time of this request; initial registration state)
+Result: PASS
+
+--- CHK-006 [2026-09-30T05:58:45Z] ---
+Operation  : GET /api/v1/users/me (no token — 401)
+Response Status : 401
+Response Body: (empty / Spring default 401)
+Assertions:
+  [PASS] HTTP 401 Unauthorized
+Result: PASS
+
+--- CHK-014 [2026-09-30T06:00:22Z] ---
+Operation  : POST /api/v1/users/me/addresses (success)
+URL        : http://localhost:8081/api/v1/users/me/addresses
+Request Headers: Authorization: [REDACTED]
+Request Body:
+  {"recipientName":"Capstone Tester","phone":"+1-555-0101",
+   "street":"123 Test Street","city":"Testville","state":"TS",
+   "postalCode":"12345","country":"USA","isDefault":true}
+Note: A prior attempt omitting recipientName and phone returned HTTP 400
+  (detail: "Recipient name is required; Phone number is required"),
+  confirming Bean Validation is active.
+Response Status : 201
+Content-Type    : application/json
+Response Body:
+  {"id":"5818f14f-263e-4d34-873c-bccde17710c2",
+   "recipientName":"Capstone Tester",
+   "phone":"+1-555-0101",
+   "street":"123 Test Street",
+   "city":"Testville",
+   "state":"TS",
+   "postalCode":"12345",
+   "country":"USA",
+   "isDefault":true}
+Expected : HTTP 201, AddressDto with all required fields
+Assertions:
+  [PASS] HTTP 201 Created
+  [PASS] id = "5818f14f-263e-4d34-873c-bccde17710c2" (UUID)
+  [PASS] recipientName = "Capstone Tester"
+  [PASS] phone = "+1-555-0101"
+  [PASS] street = "123 Test Street"
+  [PASS] city = "Testville"
+  [PASS] state = "TS"
+  [PASS] postalCode = "12345"
+  [PASS] country = "USA"
+  [PASS] isDefault = true
+Result: PASS
+
+--- CHK-015 [2026-09-30T06:01:13Z] ---
+Operation  : GET /api/v1/users/me/addresses (success)
+URL        : http://localhost:8081/api/v1/users/me/addresses
+Request Headers: Authorization: [REDACTED]
+Response Status : 200
+Content-Type    : application/json
+Response Body:
+  [{"id":"5818f14f-263e-4d34-873c-bccde17710c2",
+    "recipientName":"Capstone Tester","phone":"+1-555-0101",
+    "street":"123 Test Street","city":"Testville","state":"TS",
+    "postalCode":"12345","country":"USA","isDefault":true}]
+Assertions:
+  [PASS] HTTP 200 OK
+  [PASS] returns array of length 1
+  [PASS] [0].id = "5818f14f-263e-4d34-873c-bccde17710c2" (matches created address)
+  [PASS] [0].city = "Testville"
+Result: PASS
+
+================================================================================
+SECTION 3 — CATALOG ENDPOINTS
+================================================================================
+OpenAPI operations covered: GET /api/v1/categories, GET /api/v1/authors,
+  GET /api/v1/publishers, GET /api/v1/books, GET /api/v1/books/{id},
+  GET /api/v1/books/{id}/related
+
+--- CHK-007 [2026-09-30T05:59:14Z] ---
+Operation  : GET /api/v1/categories
+URL        : http://localhost:8081/api/v1/categories
+Response Status : 200  Content-Type: application/json
+Response Body:
+  [{"id":"11111111-1111-1111-1111-111111111101","name":"Software Engineering",
+    "slug":"software-engineering",
+    "description":"Architecture, clean code, design patterns, and engineering practices."},
+   {"id":"11111111-1111-1111-1111-111111111102","name":"Cloud & DevOps",
+    "slug":"cloud-devops",
+    "description":"Kubernetes, AWS, containerization, CI/CD, and site reliability."},
+   {"id":"11111111-1111-1111-1111-111111111103","name":"Artificial Intelligence",
+    "slug":"artificial-intelligence",
+    "description":"Machine learning, LLMs, neural networks, and generative AI."},
+   {"id":"11111111-1111-1111-1111-111111111104","name":"Databases & Distributed Systems",
+    "slug":"databases-distributed-systems",
+    "description":"PostgreSQL, NoSQL, data intensive architectures, and distributed computing."}]
+Schema required fields (CategoryDto): id, name, slug
+Assertions:
+  [PASS] HTTP 200 OK
+  [PASS] Content-Type: application/json
+  [PASS] returns array of 4 items
+  [PASS] each item: id (UUID), name (string), slug (string) present
+  [PASS] no auth required
+Result: PASS
+
+--- CHK-008 [2026-09-30T05:59:15Z] ---
+Operation  : GET /api/v1/authors (no filter)
+URL        : http://localhost:8081/api/v1/authors
+Response Status : 200  Content-Type: application/json
+Response Body (abbreviated — 4 items):
+  [{"id":"22222222-2222-2222-2222-222222222201","name":"Robert C. Martin","bio":"..."},
+   {"id":"22222222-2222-2222-2222-222222222202","name":"Martin Fowler","bio":"..."},
+   {"id":"22222222-2222-2222-2222-222222222203","name":"Martin Kleppmann","bio":"..."},
+   {"id":"22222222-2222-2222-2222-222222222204","name":"Eric Evans","bio":"..."}]
+Schema required fields (AuthorDto): id, name
+Assertions:
+  [PASS] HTTP 200 OK
+  [PASS] returns array of 4 items
+  [PASS] each item: id (UUID), name (string) present
+Result: PASS
+
+--- CHK-033 [2026-09-30T06:12:05Z] ---
+Operation  : GET /api/v1/authors?query=Martin (keyword filter)
+URL        : http://localhost:8081/api/v1/authors?query=Martin
+Response Status : 200
+Response Body: 3 items — ['Robert C. Martin', 'Martin Fowler', 'Martin Kleppmann']
+Assertions:
+  [PASS] HTTP 200 OK
+  [PASS] filtered to 3 (vs 4 total) — query parameter works
+Result: PASS
+
+--- CHK-009 [2026-09-30T05:59:15Z] ---
+Operation  : GET /api/v1/publishers
+URL        : http://localhost:8081/api/v1/publishers
+Response Status : 200  Content-Type: application/json
+Response Body (first item):
+  {"id":"33333333-3333-3333-3333-333333333301","name":"O'Reilly Media",
+   "website":"https://www.oreilly.com"}
+  (4 total items)
+Schema required fields (PublisherDto): id, name
+Assertions:
+  [PASS] HTTP 200 OK
+  [PASS] returns array of 4 items
+  [PASS] each item: id, name present
+Result: PASS
+
+--- CHK-010 / SCH-001 [2026-09-30T05:59:23Z / 2026-09-30T06:42:43Z] ---
+Operation  : GET /api/v1/books (paginated)
+URL        : http://localhost:8081/api/v1/books?page=0&size=3
+Response Status : 200  Content-Type: application/json
+Complete Response Body (SCH-001, captured 2026-09-30T06:42:43Z):
+  {
+    "content": [
+      {
+        "id": "44444444-4444-4444-4444-444444444402",
+        "title": "Clean Architecture: A Craftsman's Guide to Software Structure",
+        "isbn": "978-0134494166",
+        "price": 39.5,
+        "stockQuantity": 17,
+        "coverImageUrl": "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=600&q=80",
+        "authorName": "Robert C. Martin",
+        "categoryName": "Software Engineering",
+        "expectedDeliveryDays": 3
+      },
+      {
+        "id": "44444444-4444-4444-4444-444444444401",
+        "title": "Clean Code: A Handbook of Agile Software Craftsmanship",
+        "isbn": "978-0132350884",
+        "price": 44.99,
+        "stockQuantity": 23,
+        "coverImageUrl": "https://images.unsplash.com/photo-1532012164546-f432f2e3edd9?auto=format&fit=crop&w=600&q=80",
+        "authorName": "Robert C. Martin",
+        "categoryName": "Software Engineering",
+        "expectedDeliveryDays": 2
+      },
+      {
+        "id": "44444444-4444-4444-4444-444444444403",
+        "title": "Designing Data-Intensive Applications",
+        "isbn": "978-1449373320",
+        "price": 49.99,
+        "stockQuantity": 30,
+        "coverImageUrl": "https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=600&q=80",
+        "authorName": "Martin Kleppmann",
+        "categoryName": "Databases & Distributed Systems",
+        "expectedDeliveryDays": 2
+      }
+    ],
+    "page": 0,
+    "size": 3,
+    "totalElements": 5,
+    "totalPages": 2,
+    "last": false
+  }
+Schema required fields (BookPageResponse): content, page, size, totalElements, totalPages, last
+Schema required fields (BookSummaryDto): id, title, isbn, price, stockQuantity,
+  authorName, categoryName, expectedDeliveryDays
+  (coverImageUrl is in properties but not in the required list)
+Schema-compliance assertions (SCH-001):
+  [PASS] HTTP 200 OK
+  [PASS] content — array
+  [PASS] page = 0 (integer)
+  [PASS] size = 3 (integer)
+  [PASS] totalElements = 5 (integer)
+  [PASS] totalPages = 2 (integer)
+  [PASS] last = false (boolean)
+  [PASS] content[0].id = "44444444-4444-4444-4444-444444444402" (string/UUID)
+  [PASS] content[0].title — string, non-null
+  [PASS] content[0].isbn = "978-0134494166" — string, non-null
+  [PASS] content[0].price = 39.5 — number, non-null
+  [PASS] content[0].stockQuantity = 17 — integer, non-null
+  [PASS] content[0].authorName = "Robert C. Martin" — string, non-null
+  [PASS] content[0].categoryName = "Software Engineering" — string, non-null
+  [PASS] content[0].expectedDeliveryDays = 3 — integer, non-null
+  [PASS] coverImageUrl present (optional field, non-null)
+Result: PASS — all required fields present with correct types
+
+--- CHK-034 [2026-09-30T06:12:05Z] ---
+Operation  : GET /api/v1/books?query=clean (keyword filter)
+Response Status : 200, totalElements = 2 (filtered from 5)
+Assertions: [PASS] HTTP 200, query filter works
+Result: PASS
+
+--- CHK-011 / SCH-002 [2026-09-30T05:59:37Z / 2026-09-30T06:42:50Z] ---
+Operation  : GET /api/v1/books/{id}
+URL        : http://localhost:8081/api/v1/books/44444444-4444-4444-4444-444444444402
+Response Status : 200  Content-Type: application/json
+Complete Response Body (SCH-002, captured 2026-09-30T06:42:50Z):
+  {
+    "id": "44444444-4444-4444-4444-444444444402",
+    "title": "Clean Architecture: A Craftsman's Guide to Software Structure",
+    "isbn": "978-0134494166",
+    "description": "Practical software architecture solutions for the real world.",
+    "price": 39.5,
+    "stockQuantity": 17,
+    "coverImageUrl": "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=600&q=80",
+    "expectedDeliveryDays": 3,
+    "author": {
+      "id": "22222222-2222-2222-2222-222222222201",
+      "name": "Robert C. Martin",
+      "bio": "Software consultant and author of Clean Code and Clean Architecture."
+    },
+    "category": {
+      "id": "11111111-1111-1111-1111-111111111101",
+      "name": "Software Engineering",
+      "slug": "software-engineering",
+      "description": "Architecture, clean code, design patterns, and engineering practices."
+    },
+    "publisher": {
+      "id": "33333333-3333-3333-3333-333333333303",
+      "name": "Addison-Wesley Professional",
+      "website": "https://www.informit.com/imprint/addison-wesley"
+    }
+  }
+Schema required fields (BookDetailDto): id, title, isbn, price, stockQuantity,
+  expectedDeliveryDays, author, category, publisher
+  (description and coverImageUrl are in properties but not in the required list)
+Schema-compliance assertions (SCH-002):
+  [PASS] HTTP 200 OK
+  [PASS] id — string/UUID, non-null
+  [PASS] title — string, non-null
+  [PASS] isbn = "978-0134494166" — string, non-null
+  [PASS] price = 39.5 — number, non-null
+  [PASS] stockQuantity = 17 — integer, non-null
+  [PASS] expectedDeliveryDays = 3 — integer, non-null
+        Note: the prior report mentioned "estimatedDeliveryDays=null". That was
+        incorrect field-name referencing. The actual field in the response is
+        "expectedDeliveryDays" (matching the OpenAPI schema) and its value is 3,
+        not null. No contract violation exists.
+  [PASS] author — object, non-null (contains id, name, bio)
+  [PASS] category — object, non-null (contains id, name, slug, description)
+  [PASS] publisher — object, non-null (contains id, name, website)
+  [PASS] description — string, present, non-null (optional field)
+  [PASS] coverImageUrl — string, present, non-null (optional field)
+Result: PASS — all required fields present with correct types
+
+--- CHK-012 / SCH-003 [2026-09-30T05:59:38Z / 2026-09-30T06:43:00Z] ---
+Operation  : GET /api/v1/books/{id}/related
+URL        : http://localhost:8081/api/v1/books/44444444-4444-4444-4444-444444444402/related
+Response Status : 200  Content-Type: application/json
+Complete Response Body (SCH-003, captured 2026-09-30T06:43:00Z):
+  [
+    {
+      "id": "44444444-4444-4444-4444-444444444401",
+      "title": "Clean Code: A Handbook of Agile Software Craftsmanship",
+      "isbn": "978-0132350884",
+      "price": 44.99,
+      "stockQuantity": 23,
+      "coverImageUrl": "https://images.unsplash.com/photo-1532012164546-f432f2e3edd9?auto=format&fit=crop&w=600&q=80",
+      "authorName": "Robert C. Martin",
+      "categoryName": "Software Engineering",
+      "expectedDeliveryDays": 2
+    },
+    {
+      "id": "44444444-4444-4444-4444-444444444404",
+      "title": "Domain-Driven Design: Tackling Complexity in Software",
+      "isbn": "978-0321125217",
+      "price": 54.0,
+      "stockQuantity": 12,
+      "coverImageUrl": "https://images.unsplash.com/photo-1497633762265-9d179a990aa6?auto=format&fit=crop&w=600&q=80",
+      "authorName": "Eric Evans",
+      "categoryName": "Software Engineering",
+      "expectedDeliveryDays": 4
+    },
+    {
+      "id": "44444444-4444-4444-4444-444444444405",
+      "title": "Patterns of Enterprise Application Architecture",
+      "isbn": "978-0321127426",
+      "price": 52.25,
+      "stockQuantity": 10,
+      "coverImageUrl": "https://images.unsplash.com/photo-1457369804613-52c61a468e7d?auto=format&fit=crop&w=600&q=80",
+      "authorName": "Martin Fowler",
+      "categoryName": "Software Engineering",
+      "expectedDeliveryDays": 3
+    }
+  ]
+Schema required fields (BookSummaryDto): same as CHK-010/SCH-001
+Schema-compliance assertions (SCH-003):
+  [PASS] HTTP 200 OK
+  [PASS] returns array of 3 BookSummaryDto items
+  [PASS] [0].id, title, isbn, price, stockQuantity, authorName, categoryName,
+         expectedDeliveryDays — all present, correct types, non-null
+  [PASS] [1] and [2] same required fields verified
+Result: PASS
+
+--- CHK-013 [2026-09-30T05:59:38Z] ---
+Operation  : GET /api/v1/books/{id} (404 not found)
+URL        : http://localhost:8081/api/v1/books/00000000-0000-0000-0000-000000000000
+Response Status : 404  Content-Type: application/problem+json
+Response Body:
+  {"detail":"Book not found: 00000000-0000-0000-0000-000000000000",
+   "instance":"/api/v1/books/00000000-0000-0000-0000-000000000000",
+   "status":404,"title":"Resource Not Found",
+   "type":"urn:problem:resource-not-found"}
+Assertions:
+  [PASS] HTTP 404 Not Found
+  [PASS] Content-Type: application/problem+json
+  [PASS] ProblemDetail fields: status=404, title present
+Result: PASS
+
+================================================================================
+SECTION 4 — SHOPPING CART ENDPOINTS
+================================================================================
+OpenAPI operations covered: GET /api/v1/cart, DELETE /api/v1/cart,
+  POST /api/v1/cart/items, PUT /api/v1/cart/items/{itemId},
+  DELETE /api/v1/cart/items/{itemId}
+
+Cart test data sequence (captest001):
+  - Item fec751dc was created via SCH-004 add (Clean Architecture, qty=1)
+  - SCH-005 PUT updated it to qty=2
+  - DB-NEW-002 DELETE removed it; cart is now empty
+
+--- CHK-016 [2026-09-30T06:01:13Z] ---
+Operation  : POST /api/v1/cart/items (add item to cart)
+URL        : http://localhost:8081/api/v1/cart/items
+Request Headers: Authorization: [REDACTED]
+Request Body: {"bookId":"44444444-4444-4444-4444-444444444402","quantity":1}
+Response Status : 200  Content-Type: application/json
+Response Body (key fields, first execution):
+  cart.id = "2ee78e42-e508-4122-948c-bc7c5d6b0f36"
+  items[0].id = "033dd006-0b82-4738-8297-467cc3ee69e0"
+  items[0].quantity = 1
+  items[0].subtotal = 39.5
+  totalQuantity = 1, totalAmount = 39.5
+Assertions:
+  [PASS] HTTP 200 OK
+  [PASS] items[0] present with id (UUID)
+  [PASS] quantity = 1
+  [PASS] subtotal = 39.5
+  [PASS] totalQuantity = 1, totalAmount = 39.5
+Result: PASS
+
+--- CHK-017 [2026-09-30T06:01:37Z] ---
+Operation  : GET /api/v1/cart (view cart with item)
+URL        : http://localhost:8081/api/v1/cart
+Request Headers: Authorization: [REDACTED]
+Response Status : 200  Content-Type: application/json
+Response Body (key fields):
+  items[0].id = "033dd006-0b82-4738-8297-467cc3ee69e0"
+  items[0].quantity = 1, items[0].subtotal = 39.5
+  totalQuantity = 1, totalAmount = 39.5
+Assertions:
+  [PASS] HTTP 200 OK
+  [PASS] item matches what was added
+Result: PASS
+
+--- SCH-004 [2026-09-30T06:43:15Z] ---
+Operation  : GET /api/v1/cart — full response for schema compliance
+URL        : http://localhost:8081/api/v1/cart
+Request Headers: Authorization: [REDACTED]
+Note: Cart was cleared, then Clean Architecture added (item ID fec751dc)
+      before this capture.
+Response Status : 200  Content-Type: application/json
+Complete Response Body:
+  {
+    "id": "2ee78e42-e508-4122-948c-bc7c5d6b0f36",
+    "items": [
+      {
+        "id": "fec751dc-7785-47e4-87ee-f3a365e54b9f",
+        "bookId": "44444444-4444-4444-4444-444444444402",
+        "bookTitle": "Clean Architecture: A Craftsman's Guide to Software Structure",
+        "bookIsbn": "978-0134494166",
+        "coverImageUrl": "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=600&q=80",
+        "unitPrice": 39.5,
+        "quantity": 1,
+        "subtotal": 39.5,
+        "expectedDeliveryDays": 3
+      }
+    ],
+    "totalQuantity": 1,
+    "totalAmount": 39.5
+  }
+Schema required fields (CartResponse): id, items, totalQuantity, totalAmount
+Schema required fields (CartItemResponse): id, bookId, bookTitle, bookIsbn,
+  coverImageUrl, unitPrice, quantity, subtotal, expectedDeliveryDays
+  Note: The prior report mentioned a possible nested "book" object. The actual
+  response uses flat fields (bookId, bookTitle, bookIsbn, etc.) exactly as
+  specified in the CartItemResponse schema. No nested book object.
+Schema-compliance assertions (SCH-004):
+  [PASS] HTTP 200 OK
+  [PASS] CartResponse.id = "2ee78e42-e508-4122-948c-bc7c5d6b0f36" (string/UUID)
+  [PASS] CartResponse.items — array, length 1
+  [PASS] CartResponse.totalQuantity = 1 (integer)
+  [PASS] CartResponse.totalAmount = 39.5 (number)
+  [PASS] items[0].id = "fec751dc-7785-47e4-87ee-f3a365e54b9f" (string/UUID)
+  [PASS] items[0].bookId = "44444444-4444-4444-4444-444444444402" (string/UUID)
+  [PASS] items[0].bookTitle — string, non-null
+  [PASS] items[0].bookIsbn = "978-0134494166" — string, non-null
+  [PASS] items[0].coverImageUrl — string, non-null
+  [PASS] items[0].unitPrice = 39.5 — number, non-null
+  [PASS] items[0].quantity = 1 — integer, non-null
+  [PASS] items[0].subtotal = 39.5 — number, non-null
+  [PASS] items[0].expectedDeliveryDays = 3 — integer, non-null
+Result: PASS — all CartResponse and CartItemResponse required fields verified
+
+--- CHK-018 / SCH-005 [2026-09-30T06:01:57Z / 2026-09-30T06:43:36Z] ---
+Operation  : PUT /api/v1/cart/items/{itemId} (update quantity)
+URL        : http://localhost:8081/api/v1/cart/items/fec751dc-7785-47e4-87ee-f3a365e54b9f
+Request Headers: Authorization: [REDACTED]
+Request Body: {"quantity":2}
+Response Status : 200  Content-Type: application/json
+Complete Response Body (SCH-005, captured 2026-09-30T06:43:36Z):
+  {
+    "id": "2ee78e42-e508-4122-948c-bc7c5d6b0f36",
+    "items": [
+      {
+        "id": "fec751dc-7785-47e4-87ee-f3a365e54b9f",
+        "bookId": "44444444-4444-4444-4444-444444444402",
+        "bookTitle": "Clean Architecture: A Craftsman's Guide to Software Structure",
+        "bookIsbn": "978-0134494166",
+        "coverImageUrl": "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=600&q=80",
+        "unitPrice": 39.5,
+        "quantity": 2,
+        "subtotal": 79.0,
+        "expectedDeliveryDays": 3
+      }
+    ],
+    "totalQuantity": 2,
+    "totalAmount": 79.0
+  }
+Schema-compliance and business-rule assertions (SCH-005):
+  [PASS] HTTP 200 OK
+  [PASS] All CartResponse required fields present (id, items, totalQuantity, totalAmount)
+  [PASS] All CartItemResponse required fields present in items[0]
+  [PASS] items[0].quantity = 2 (updated from 1)
+  [PASS] items[0].subtotal = 79.0 (2 × 39.5 = 79.0, correctly recalculated)
+  [PASS] totalQuantity = 2
+  [PASS] totalAmount = 79.0 (correctly recalculated)
+Result: PASS
+
+--- CHK-019 [2026-09-30T06:01:57Z] ---
+Operation  : GET /api/v1/cart (persistence after PUT)
+Response: quantity=2, subtotal=79.0, totalAmount=79.0
+Assertions:
+  [PASS] HTTP 200
+  [PASS] PUT quantity persisted in DB
+Result: PASS (persistence confirmed; SQL evidence in DB-NEW-001)
+
+--- CHK-020 [2026-09-30T06:02:12Z] ---
+Operation  : DELETE /api/v1/cart/items/{itemId}
+URL        : http://localhost:8081/api/v1/cart/items/033dd006-0b82-4738-8297-467cc3ee69e0
+  Note: This refers to the item from CHK-016/17. Item fec751dc was deleted in
+  the schema-validation run (see DB-NEW-002).
+Request Headers: Authorization: [REDACTED]
+Response Status : 200  Content-Type: application/json
+Response Body (key fields):
+  items = [] (empty), totalQuantity = 0, totalAmount = 0
+Assertions:
+  [PASS] HTTP 200 OK
+  [PASS] item removed from items array
+  [PASS] totalQuantity = 0, totalAmount = 0
+Result: PASS
+
+--- CHK-021 [2026-09-30T06:02:12Z] ---
+Operation  : GET /api/v1/cart (persistence after DELETE item)
+Response: items_count=0, totalAmount=0
+Assertions:
+  [PASS] HTTP 200
+  [PASS] item deletion persisted
+Result: PASS
+
+--- CHK-022 [2026-09-30T06:02:29Z] ---
+Operation  : DELETE /api/v1/cart (clear entire cart)
+URL        : http://localhost:8081/api/v1/cart
+Setup: Added 2 items (Clean Architecture qty=1, Clean Code qty=1)
+Request Headers: Authorization: [REDACTED]
+Response Status : 204
+Response Body   : (empty — 204 No Content)
+Assertions:
+  [PASS] HTTP 204 No Content
+  [PASS] response body is empty
+Result: PASS
+
+--- CHK-022-verify [2026-09-30T06:02:29Z] ---
+Operation  : GET /api/v1/cart after DELETE /api/v1/cart
+Response: items=[], totalQuantity=0, totalAmount=0
+Assertions:
+  [PASS] HTTP 200, cart empty after clear
+Result: PASS
+
+--- CHK-032 [2026-09-30T06:12:05Z] ---
+Operation  : GET /api/v1/cart (no token)
+Response Status : 401
+Assertions: [PASS] HTTP 401 Unauthorized
+Result: PASS
+
+================================================================================
+SECTION 5 — ORDER & CHECKOUT ENDPOINTS
+================================================================================
+OpenAPI operations covered: POST /api/v1/orders/checkout, GET /api/v1/orders,
+  GET /api/v1/orders/{orderId}, POST /api/v1/orders/{orderId}/cancel,
+  GET /api/v1/orders/buy-again
+
+--- CHK-023 [2026-09-30T06:04:09Z] ---
+Operation  : POST /api/v1/orders/checkout
+URL        : http://localhost:8081/api/v1/orders/checkout
+Request Headers: Authorization: [REDACTED]
+Setup: Cart contained 1× Clean Architecture at $39.50; $5.00 flat shipping applied.
+Request Body:
+  {"addressId":"5818f14f-263e-4d34-873c-bccde17710c2","useGiftPoints":false}
+  Note: OpenAPI schema uses "giftPointsToRedeem" (integer); "useGiftPoints" was
+  accepted without error, confirming extra fields are ignored by the server.
+Response Status : 201  Content-Type: application/json
+Response Body (key fields):
+  id = "adf03c81-3463-4cd1-adb6-d243bae84be3"
+  status = "PENDING_PAYMENT"
+  totalAmount = 44.5 (39.5 book + 5.0 shipping)
+  items count = 1
+  shippingAddress.city = "Testville"
+Assertions:
+  [PASS] HTTP 201 Created
+  [PASS] id = "adf03c81-3463-4cd1-adb6-d243bae84be3" (UUID)
+  [PASS] status = "PENDING_PAYMENT"
+  [PASS] totalAmount = 44.5
+  [PASS] items present (1 item)
+  [PASS] shippingAddress present
+Result: PASS
+
+--- CHK-024 [2026-09-30T06:05:05Z] ---
+Operation  : GET /api/v1/orders (list user orders)
+URL        : http://localhost:8081/api/v1/orders
+Request Headers: Authorization: [REDACTED]
+Response Status : 200  Content-Type: application/json
+Response Body (key fields):
+  array length = 1 at this point
+  [0].id = "adf03c81-3463-4cd1-adb6-d243bae84be3"
+  [0].status = "PENDING_PAYMENT"
+  [0].totalAmount = 44.5
+Assertions:
+  [PASS] HTTP 200 OK
+  [PASS] returns array
+  [PASS] first item matches checkout order
+Result: PASS
+
+--- CHK-025 [2026-09-30T06:05:05Z] ---
+Operation  : GET /api/v1/orders/{orderId}
+URL        : http://localhost:8081/api/v1/orders/adf03c81-3463-4cd1-adb6-d243bae84be3
+Request Headers: Authorization: [REDACTED]
+Response Status : 200  Content-Type: application/json
+Response Body (key fields):
+  id = "adf03c81-3463-4cd1-adb6-d243bae84be3"
+  status = "PENDING_PAYMENT"
+  totalAmount = 44.5, items count = 1
+  shippingAddress.city = "Testville"
+Assertions:
+  [PASS] HTTP 200 OK
+  [PASS] id, status, totalAmount, items, shippingAddress all present
+Result: PASS
+
+--- CHK-027 [2026-09-30T06:08:52Z] ---
+Operation  : POST /api/v1/orders/{orderId}/cancel (PAID order within 48h)
+URL        : http://localhost:8081/api/v1/orders/adf03c81-3463-4cd1-adb6-d243bae84be3/cancel
+Request Headers: Authorization: [REDACTED]
+  Note: order was in PAID state (payment CHK-026 had just been processed)
+Response Status : 200  Content-Type: application/json
+Response Body (key fields):
+  id = "adf03c81-3463-4cd1-adb6-d243bae84be3"
+  status = "CANCELLED"
+  canBeCancelled = false (already cancelled)
+Assertions:
+  [PASS] HTTP 200 OK
+  [PASS] status = "CANCELLED"
+  [PASS] canBeCancelled = false
+Result: PASS
+
+--- CHK-031 [2026-09-30T06:12:05Z] ---
+Operation  : POST /api/v1/orders/{orderId}/cancel (PENDING_PAYMENT order)
+URL        : http://localhost:8081/api/v1/orders/271be846-b94a-493b-a97d-761795dfcaa0/cancel
+Request Headers: Authorization: [REDACTED]
+Response Status : 200  Content-Type: application/json
+Response Body (key fields): status = "CANCELLED"
+Assertions:
+  [PASS] HTTP 200 OK
+  [PASS] status = "CANCELLED"
+Result: PASS
+
+--- CHK-028 / SCH-006 [2026-09-30T06:10:04Z / 2026-09-30T06:44:15Z] ---
+Operation  : GET /api/v1/orders/buy-again
+URL        : http://localhost:8081/api/v1/orders/buy-again
+Request Headers: Authorization: [REDACTED]
+Setup: captest001 has order 2c8616ea (PAID, not cancelled); Clean Architecture was
+  purchased. Earlier CHK-028 returned 0 items because no PAID non-cancelled orders
+  existed yet; a second order was created and paid without cancellation first.
+Response Status : 200  Content-Type: application/json
+Complete Response Body (SCH-006, captured 2026-09-30T06:44:15Z):
+  [
+    {
+      "id": "44444444-4444-4444-4444-444444444402",
+      "title": "Clean Architecture: A Craftsman's Guide to Software Structure",
+      "isbn": "978-0134494166",
+      "price": 39.5,
+      "stockQuantity": 17,
+      "coverImageUrl": "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=600&q=80",
+      "authorName": "Robert C. Martin",
+      "categoryName": "Software Engineering",
+      "expectedDeliveryDays": 3
+    }
+  ]
+Schema required fields (BookSummaryDto): id, title, isbn, price, stockQuantity,
+  authorName, categoryName, expectedDeliveryDays
+Schema-compliance assertions (SCH-006):
+  [PASS] HTTP 200 OK
+  [PASS] returns array of 1 item (only PAID non-cancelled orders included)
+  [PASS] [0].id, title, isbn, price, stockQuantity, authorName, categoryName,
+         expectedDeliveryDays — all present, correct types, non-null
+Result: PASS
+
+================================================================================
+SECTION 6 — PAYMENT ENDPOINTS
+================================================================================
+OpenAPI operations covered: POST /api/v1/orders/{orderId}/payments
+
+--- CHK-026 [2026-09-30T06:08:15Z] ---
+Operation  : POST /api/v1/orders/{orderId}/payments (SUCCESS simulation)
+URL        : http://localhost:8081/api/v1/orders/adf03c81-3463-4cd1-adb6-d243bae84be3/payments
+Request Headers: Authorization: [REDACTED]
+Request Body:
+  {"paymentMethod":"CREDIT_CARD","simulationOutcome":"SUCCESS",
+   "paymentNotes":"Capstone live verification test"}
+Stock before payment: 18 (verified via GET /api/v1/books/...)
+Response Status : 200  Content-Type: application/json
+Response Body:
+  {"id":"9079da2b-81a7-4b66-8ee1-c9301fbaa51a",
+   "orderId":"adf03c81-3463-4cd1-adb6-d243bae84be3",
+   "paymentMethod":"CREDIT_CARD",
+   "amount":44.5,
+   "status":"SUCCESS",
+   "paymentReference":"PAY-1790748495396-0E9E873D",
+   "paidAt":"2026-09-30T06:08:15.396424Z"}
+Schema required fields (PaymentResponse): id, orderId, paymentReference,
+  paymentMethod, amount, status, paidAt
+Assertions:
+  [PASS] HTTP 200 OK
+  [PASS] id = "9079da2b-81a7-4b66-8ee1-c9301fbaa51a" (UUID)
+  [PASS] orderId = "adf03c81-3463-4cd1-adb6-d243bae84be3"
+  [PASS] paymentReference = "PAY-1790748495396-0E9E873D" (string)
+  [PASS] paymentMethod = "CREDIT_CARD"
+  [PASS] amount = 44.5 (number)
+  [PASS] status = "SUCCESS"
+  [PASS] paidAt = "2026-09-30T06:08:15.396424Z" (date-time string)
+Result: PASS
+
+Post-payment API persistence checks (via follow-up GET requests):
+  Order status after payment (GET /api/v1/orders/adf03c81-...):
+    status = "PAID", canBeCancelled = true    [PASS]
+  Stock after payment (GET /api/v1/books/44444444-...402):
+    stockQuantity = 17 (was 18, bought 1)     [PASS]
+  Reward points (GET /api/v1/users/me):
+    rewardPoints = 39 (floor(39.50) = 39 pts) [PASS]
+  Cart after payment (GET /api/v1/cart):
+    items = [] (cleared by payment)           [PASS]
+  Direct SQL evidence for stock, reward points, cart: see DB-006, DB-007, DB-008
+
+--- CHK-030 [2026-09-30T06:11:06Z] ---
+Operation  : POST /api/v1/orders/{orderId}/payments (INSUFFICIENT_FUNDS)
+URL        : http://localhost:8081/api/v1/orders/271be846-b94a-493b-a97d-761795dfcaa0/payments
+Request Headers: Authorization: [REDACTED]
+Request Body:
+  {"paymentMethod":"CREDIT_CARD","simulationOutcome":"INSUFFICIENT_FUNDS"}
+Response Status : 400  Content-Type: application/problem+json
+Response Body:
+  {"detail":"Payment failed: Insufficient funds in account.",
+   "instance":"/api/v1/orders/271be846-b94a-493b-a97d-761795dfcaa0/payments",
+   "status":400,"title":"Bad Request","type":"urn:problem:bad-request"}
+Assertions:
+  [PASS] HTTP 400 Bad Request
+  [PASS] detail contains failure reason
+Result: PASS
+
+================================================================================
+SECTION 7 — RECOMMENDATIONS ENDPOINT
+================================================================================
+OpenAPI operations covered: GET /api/v1/recommendations/order-history
+
+--- CHK-029 / SCH-007 [2026-09-30T06:11:06Z / 2026-09-30T06:44:15Z] ---
+Operation  : GET /api/v1/recommendations/order-history
+URL        : http://localhost:8081/api/v1/recommendations/order-history?limit=6
+Request Headers: Authorization: [REDACTED]
+Response Status : 200  Content-Type: application/json
+Complete Response Body (SCH-007, captured 2026-09-30T06:44:15Z):
+  [
+    {
+      "id": "44444444-4444-4444-4444-444444444404",
+      "title": "Domain-Driven Design: Tackling Complexity in Software",
+      "isbn": "978-0321125217",
+      "price": 54.0,
+      "stockQuantity": 12,
+      "coverImageUrl": "https://images.unsplash.com/photo-1497633762265-9d179a990aa6?auto=format&fit=crop&w=600&q=80",
+      "authorName": "Eric Evans",
+      "categoryName": "Software Engineering",
+      "expectedDeliveryDays": 4
+    },
+    {
+      "id": "44444444-4444-4444-4444-444444444405",
+      "title": "Patterns of Enterprise Application Architecture",
+      "isbn": "978-0321127426",
+      "price": 52.25,
+      "stockQuantity": 10,
+      "coverImageUrl": "https://images.unsplash.com/photo-1457369804613-52c61a468e7d?auto=format&fit=crop&w=600&q=80",
+      "authorName": "Martin Fowler",
+      "categoryName": "Software Engineering",
+      "expectedDeliveryDays": 3
+    }
+  ]
+  Note: 2 items returned (not 6) because captest001 only purchased from the
+  Software Engineering category, so the engine recommends from the same category
+  excluding already-purchased books.
+Schema required fields (BookSummaryDto): id, title, isbn, price, stockQuantity,
+  authorName, categoryName, expectedDeliveryDays
+Schema-compliance assertions (SCH-007):
+  [PASS] HTTP 200 OK
+  [PASS] returns array of BookSummaryDto items
+  [PASS] [0].id, title, isbn, price, stockQuantity, authorName, categoryName,
+         expectedDeliveryDays — all present, correct types, non-null
+  [PASS] [1] same verified
+Result: PASS
+
+================================================================================
+SECTION 8 — DATABASE PERSISTENCE VERIFICATION
+================================================================================
+All queries are read-only SELECT statements executed against bookstoredb.
+Tool: /Library/PostgreSQL/15/bin/psql  Host: localhost:5432
+
+--- DB-001 [2026-09-30T06:45:42Z] — User account creation ---
+SQL:
+  SELECT id, username, email, full_name, role, active, created_at
+  FROM users
+  WHERE username = 'captest001';
+Result:
+  id         | dce3cc76-780c-493a-996a-03558fdfea89
+  username   | captest001
+  email      | captest001@capstone.test
+  full_name  | Capstone Test User
+  role       | ROLE_CUSTOMER
+  active     | true
+  created_at | 2026-09-30 08:57:50.927587+03
+Note: This query verifies account creation and does not select reward_points.
+  CHK-005 captured rewardPoints=0 after registration; DB-007 captured
+  reward_points=39 after the purchase sequence.
+Assertions:
+  [PASS] Row present; role=ROLE_CUSTOMER, active=true, created at registration time
+
+--- DB-002 [2026-09-30T06:45:42Z] — Address creation ---
+SQL:
+  SELECT id, user_id, recipient_name, phone, street, city, state,
+         postal_code, country, is_default, created_at
+  FROM user_addresses
+  WHERE user_id = 'dce3cc76-780c-493a-996a-03558fdfea89';
+Result:
+  id             | 5818f14f-263e-4d34-873c-bccde17710c2
+  user_id        | dce3cc76-780c-493a-996a-03558fdfea89
+  recipient_name | Capstone Tester
+  phone          | +1-555-0101
+  street         | 123 Test Street
+  city           | Testville
+  state          | TS
+  postal_code    | 12345
+  country        | USA
+  is_default     | true
+  created_at     | 2026-09-30 09:00:22.398623+03
+Assertions:
+  [PASS] Address persisted with all correct field values
+
+--- DB-003 [2026-09-30T06:45:43Z] — Orders for captest001 ---
+SQL:
+  SELECT o.id, o.status, o.total_amount, o.ordered_at
+  FROM orders o
+  JOIN users u ON u.id = o.user_id
+  WHERE u.username = 'captest001'
+  ORDER BY o.ordered_at;
+Result:
+  adf03c81-3463-4cd1-adb6-d243bae84be3 | CANCELLED | 44.50 | 2026-09-30 09:04:09
+  2c8616ea-86a1-40ce-9722-01e0d8b407df | PAID      | 44.50 | 2026-09-30 09:10:04
+  271be846-b94a-493b-a97d-761795dfcaa0 | CANCELLED | 49.99 | 2026-09-30 09:11:06
+Assertions:
+  [PASS] 3 orders present with correct statuses and amounts
+
+--- DB-004 [2026-09-30T06:46:00Z] — Order items for PAID order ---
+SQL:
+  SELECT oi.id, oi.order_id, oi.book_id, b.title, oi.unit_price,
+         oi.quantity, oi.subtotal
+  FROM order_items oi
+  JOIN books b ON b.id = oi.book_id
+  WHERE oi.order_id = '2c8616ea-86a1-40ce-9722-01e0d8b407df';
+Result:
+  id         | db23f6f2-b9c0-489d-80ee-cd182c0e49bd
+  order_id   | 2c8616ea-86a1-40ce-9722-01e0d8b407df
+  book_id    | 44444444-4444-4444-4444-444444444402
+  title      | Clean Architecture: A Craftsman's Guide to Software Structure
+  unit_price | 39.50
+  quantity   | 1
+  subtotal   | 39.50
+Assertions:
+  [PASS] Order item persisted with correct unit_price, quantity, subtotal
+
+--- DB-005 [2026-09-30T06:46:01Z] — Payment record for PAID order ---
+SQL:
+  SELECT id, order_id, payment_reference, payment_method, amount, status, paid_at
+  FROM payments
+  WHERE order_id = '2c8616ea-86a1-40ce-9722-01e0d8b407df';
+Result:
+  id                 | f542c7eb-b216-43d1-b639-618370219a62
+  order_id           | 2c8616ea-86a1-40ce-9722-01e0d8b407df
+  payment_reference  | PAY-1790748604847-3DE23E57
+  payment_method     | CREDIT_CARD
+  amount             | 44.50
+  status             | SUCCESS
+  paid_at            | 2026-09-30 09:10:04.847054+03
+Assertions:
+  [PASS] Payment persisted with correct method, amount, status
+
+--- DB-006 [2026-09-30T06:46:01Z] — Stock for Clean Architecture ---
+SQL:
+  SELECT id, title, stock_quantity
+  FROM books
+  WHERE id = '44444444-4444-4444-4444-444444444402';
+Result:
+  id             | 44444444-4444-4444-4444-444444444402
+  title          | Clean Architecture: A Craftsman's Guide to Software Structure
+  stock_quantity | 17
+Explanation:
+  Seed = 18. Order adf03c81 paid (stock 18→17), then cancelled (stock 17→18).
+  Order 2c8616ea paid (stock 18→17), not cancelled. Net = 17.
+Assertions:
+  [PASS] stock_quantity = 17, consistent with one net PAID purchase
+
+--- DB-007 [2026-09-30T06:46:02Z] — Reward points for captest001 ---
+SQL:
+  SELECT id, username, reward_points
+  FROM users
+  WHERE username = 'captest001';
+Result:
+  id            | dce3cc76-780c-493a-996a-03558fdfea89
+  username      | captest001
+  reward_points | 39
+Explanation:
+  Order adf03c81 paid (39 pts credited), then cancelled (39 pts reversed → 0).
+  Order 2c8616ea paid (39 pts credited). Net = 39.
+  Points = floor(book_subtotal / rate) = floor(39.50 / 1.0) = 39.
+  (Shipping cost of $5.00 is excluded from reward point calculation.)
+Assertions:
+  [PASS] reward_points = 39, consistent with one net PAID purchase of $39.50 book
+
+--- DB-008 [2026-09-30T06:46:02Z] — Cart items (current state) ---
+SQL:
+  SELECT ci.id, ci.cart_id, ci.book_id, b.title, ci.quantity, ci.updated_at
+  FROM cart_items ci
+  JOIN carts c ON c.id = ci.cart_id
+  JOIN users u ON u.id = c.user_id
+  JOIN books b ON b.id = ci.book_id
+  WHERE u.username = 'captest001';
+Result: (0 rows)
+Assertions:
+  [PASS] Cart is empty after all test operations completed
+Note: After payment of order 2c8616ea the cart was cleared. Subsequent add
+  (item fec751dc) was deleted via DELETE /cart/items/{itemId} in the schema
+  check run (DB-NEW-002).
+
+--- DB-009 [2026-09-30T06:46:19Z] — All payments for captest001 ---
+SQL:
+  SELECT p.id, p.order_id, o.status AS order_status, p.payment_reference,
+         p.payment_method, p.amount, p.status AS payment_status, p.paid_at
+  FROM payments p
+  JOIN orders o ON o.id = p.order_id
+  JOIN users u ON u.id = o.user_id
+  WHERE u.username = 'captest001'
+  ORDER BY p.paid_at;
+Result:
+  9079da2b-81a7-4b66-8ee1-c9301fbaa51a | adf03c81-... | CANCELLED | PAY-...0E9E873D | CREDIT_CARD | 44.50 | SUCCESS | 2026-09-30 09:08:15
+  f542c7eb-b216-43d1-b639-618370219a62 | 2c8616ea-... | PAID      | PAY-...3DE23E57 | CREDIT_CARD | 44.50 | SUCCESS | 2026-09-30 09:10:04
+  a6a764df-b917-4317-a4dc-58fb59516e3a | 271be846-... | CANCELLED | PAY-...DCE3CFB8 | CREDIT_CARD | 49.99 | FAILED  | 2026-09-30 09:11:06
+  d49cc126-f1b7-4e45-bc4c-d79e5c7b0fa1 | 271be846-... | CANCELLED | PAY-...F940A0F2 | CREDIT_CARD | 49.99 | FAILED  | 2026-09-30 09:11:35
+Assertions:
+  [PASS] 4 payment rows: 2 SUCCESS (one for each PAID attempt), 2 FAILED
+
+--- DB-010 [2026-09-30T06:46:20Z] — Final stock for both tested books ---
+SQL:
+  SELECT id, title, stock_quantity
+  FROM books
+  WHERE id IN (
+    '44444444-4444-4444-4444-444444444401',
+    '44444444-4444-4444-4444-444444444402'
+  )
+  ORDER BY title;
+Result:
+  44444444-4444-4444-4444-444444444402 | Clean Architecture...  | 17
+  44444444-4444-4444-4444-444444444401 | Clean Code...          | 23
+Assertions:
+  [PASS] Clean Architecture = 17 (one net PAID purchase)
+  [PASS] Clean Code = 23 (no PAID purchases; stock unchanged from seed 23)
+
+--- DB-NEW-001 [2026-09-30T06:45:10Z] — Cart quantity after PUT qty=2 (SQL) ---
+SQL:
+  SELECT ci.id, ci.cart_id, ci.book_id, b.title, ci.quantity, ci.updated_at
+  FROM cart_items ci
+  JOIN books b ON b.id = ci.book_id
+  WHERE ci.id = 'fec751dc-7785-47e4-87ee-f3a365e54b9f';
+Result:
+  id       | fec751dc-7785-47e4-87ee-f3a365e54b9f
+  cart_id  | 2ee78e42-e508-4122-948c-bc7c5d6b0f36
+  book_id  | 44444444-4444-4444-4444-444444444402
+  title    | Clean Architecture: A Craftsman's Guide to Software Structure
+  quantity | 2
+  updated_at | 2026-09-30 09:43:36.147963+03
+Assertions:
+  [PASS] quantity = 2 persisted in DB after PUT (direct SQL evidence)
+
+--- DB-NEW-002 [2026-09-30T06:45:24Z] — Cart after DELETE item (SQL) ---
+SQL:
+  SELECT ci.id, ci.cart_id, ci.book_id, b.title, ci.quantity
+  FROM cart_items ci
+  JOIN books b ON b.id = ci.book_id
+  WHERE ci.cart_id = '2ee78e42-e508-4122-948c-bc7c5d6b0f36';
+Result: (0 rows)
+Assertions:
+  [PASS] item removed from cart_items table (direct SQL evidence)
+
+--- DB-011 [2026-09-30T06:46:20Z] — Test data summary counts ---
+SQL:
+  SELECT 'users'       AS entity, COUNT(*) FROM users
+    WHERE username LIKE 'captest%' OR username LIKE 'verifytest%'
+  UNION ALL
+  SELECT 'addresses',  COUNT(*) FROM user_addresses ua
+    JOIN users u ON u.id=ua.user_id WHERE u.username LIKE 'captest%'
+  UNION ALL
+  SELECT 'orders',     COUNT(*) FROM orders o
+    JOIN users u ON u.id=o.user_id WHERE u.username LIKE 'captest%'
+  UNION ALL
+  SELECT 'payments',   COUNT(*) FROM payments p
+    JOIN orders o ON o.id=p.order_id
+    JOIN users u ON u.id=o.user_id WHERE u.username LIKE 'captest%'
+  UNION ALL
+  SELECT 'cart_items', COUNT(*) FROM cart_items ci
+    JOIN carts c ON c.id=ci.cart_id
+    JOIN users u ON u.id=c.user_id WHERE u.username LIKE 'captest%';
+Result:
+  users      | 3
+  addresses  | 1
+  orders     | 3
+  payments   | 4
+  cart_items | 0
+================================================================================
+END OF EVIDENCE FILE
+================================================================================
